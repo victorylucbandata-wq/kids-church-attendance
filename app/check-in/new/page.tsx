@@ -1,6 +1,30 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '📝',
+    title: 'Fill in the details',
+    body: 'Enter the parent/guardian name, contact number, and your child\'s name. Fields marked with * are required.',
+  },
+  {
+    emoji: '🎨',
+    title: 'Pick the age group & service',
+    body: 'Choose your child\'s age group and the service you\'re attending so we can place them in the right class.',
+  },
+  {
+    emoji: '🍎',
+    title: 'Add allergies or notes',
+    body: 'Let us know about any allergies or special needs in the notes box. This is optional but helpful.',
+  },
+  {
+    emoji: '✅',
+    title: 'Check in',
+    body: 'Tap "Check In". Your child is registered and marked present at the same time — no need to do it again next week!',
+  },
+]
 
 type FirstTimerForm = {
   parentName: string
@@ -267,6 +291,8 @@ export default function FirstTimerPage() {
           </a>
         </div>
       </section>
+
+      <HelpWizard title="How to register" steps={HELP_STEPS} />
     </main>
   )
 }

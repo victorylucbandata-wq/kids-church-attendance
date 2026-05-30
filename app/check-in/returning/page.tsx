@@ -2,6 +2,30 @@
 
 import { useEffect, useState } from 'react'
 import { UncheckedMember } from '@/app/lib/types'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '🎨',
+    title: 'Step 1 — Pick the age group',
+    body: 'Tap your child\'s age group. Only groups with kids still to check in are shown.',
+  },
+  {
+    emoji: '🙋',
+    title: 'Step 2 — Tap the name',
+    body: 'Find your child in the list and tap their name. You can add allergies or notes before confirming.',
+  },
+  {
+    emoji: '✅',
+    title: 'Step 3 — Confirm',
+    body: 'Tap the "Check In" button. A green message confirms it, and the name disappears from the list.',
+  },
+  {
+    emoji: '🆕',
+    title: 'First time here?',
+    body: 'If your child isn\'t in the list, use the "Register instead" link at the bottom to add them.',
+  },
+]
 
 const AGE_GROUPS = [
   { label: 'Preschool', emoji: '🎨' },
@@ -282,6 +306,8 @@ export default function ReturningPage() {
           </a>
         </div>
       </div>
+
+      <HelpWizard title="How to check in" steps={HELP_STEPS} />
     </main>
   )
 }

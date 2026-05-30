@@ -1,5 +1,29 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import HelpWizard, { HelpStep } from './components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '👋',
+    title: 'Returning Member',
+    body: 'If your child has checked in before, tap "Returning Member", pick their age group, then tap their name. Done!',
+  },
+  {
+    emoji: '✨',
+    title: 'First Timer',
+    body: 'New here? Tap "First Timer" and fill in a few details about your child. They\'ll be registered and checked in at the same time.',
+  },
+  {
+    emoji: '📝',
+    title: 'Allergies & Notes',
+    body: 'When checking in, you can add allergies or special notes so our volunteers know how to care for your child today.',
+  },
+  {
+    emoji: '🙋',
+    title: 'Need a hand?',
+    body: 'Tap the blue "?" button anytime to see these tips again, or just ask one of our friendly volunteers!',
+  },
+]
 
 export default function HomePage() {
   return (
@@ -68,6 +92,8 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+
+      <HelpWizard title="How to check in" steps={HELP_STEPS} />
     </main>
   )
 }
