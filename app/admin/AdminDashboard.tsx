@@ -3,8 +3,37 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminData } from '@/app/lib/types'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
 
 const SCHEDULES = ['Sunday Morning', 'Sunday Afternoon', 'Special Event']
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '👋',
+    title: 'What this page is for',
+    body: 'This is the leader page. Use it to open check-in for the day and watch who has arrived. Parents can\'t check anyone in until you start a session here.',
+  },
+  {
+    emoji: '▶️',
+    title: 'Step 1 — Start the session',
+    body: 'Under "Today\'s Session", pick the service (e.g. Sunday Morning) and tap Generate. This builds today\'s list from all active members. Do this once at the start of the day.',
+  },
+  {
+    emoji: '📊',
+    title: 'Step 2 — Watch the numbers',
+    body: 'The three cards show Total Members, Checked In, and Not Yet In. They update each time you reload the page.',
+  },
+  {
+    emoji: '🧒',
+    title: 'Step 3 — Check the lists',
+    body: 'The Member Attendance table shows who\'s in and at what time. First Timers shows new kids registered today, with parent contact and any allergy notes.',
+  },
+  {
+    emoji: '🔒',
+    title: 'When you\'re done',
+    body: 'Tap Logout to secure the page. You don\'t need to "close" the session — a new one is started next service day.',
+  },
+]
 
 type Props = {
   initialData: (AdminData & { success: boolean }) | null
@@ -236,6 +265,8 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           </a>
         </div>
       </div>
+
+      <HelpWizard title="Admin guide" steps={HELP_STEPS} />
     </main>
   )
 }
