@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function HomePage() {
   return (
@@ -9,8 +10,15 @@ export default function HomePage() {
         <div className="absolute bottom-8 -left-10 h-20 w-20 rounded-full bg-pink-200/60" />
 
         <div className="relative mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#227EEE] text-4xl shadow-lg shadow-blue-200">
-            🧒
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg shadow-blue-200">
+            <Image
+              src="/kids_logo.jpg"
+              alt="Kids Church logo"
+              width={80}
+              height={80}
+              priority
+              className="h-full w-full object-contain"
+            />
           </div>
           <p className="text-sm font-bold uppercase tracking-wide text-[#227EEE]">Kids Church</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">
