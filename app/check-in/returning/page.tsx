@@ -4,11 +4,8 @@ import { useEffect, useState } from 'react'
 import { UncheckedMember } from '@/app/lib/types'
 
 const AGE_GROUPS = [
-  { label: 'Toddlers', emoji: '🍼' },
   { label: 'Preschool', emoji: '🎨' },
-  { label: 'Kinder', emoji: '🌟' },
-  { label: 'Grades 1-3', emoji: '📚' },
-  { label: 'Grades 4-6', emoji: '🚀' },
+  { label: 'Preteens', emoji: '🧒' },
 ]
 
 type Step = 'group-select' | 'member-select'

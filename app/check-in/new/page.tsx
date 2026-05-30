@@ -213,12 +213,8 @@ export default function FirstTimerPage() {
                   className={inputClass}
                 >
                   <option value="">Select age group</option>
-                  <option value="Toddlers">Toddlers</option>
                   <option value="Preschool">Preschool</option>
-                  <option value="Kinder">Kinder</option>
-                  <option value="Grades 1-3">Grades 1-3</option>
-                  <option value="Grades 4-6">Grades 4-6</option>
-                  <option value="Not sure">Not sure</option>
+                  <option value="Preteens">Preteens</option>
                 </select>
               </label>
 

@@ -1,4 +1,4 @@
-export type AgeGroup = 'Toddlers' | 'Preschool' | 'Kinder' | 'Grades 1-3' | 'Grades 4-6' | 'Not sure'
+export type AgeGroup = 'Preschool' | 'Preteens'
 
 export type ServiceSchedule = 'Sunday Morning' | 'Sunday Afternoon' | 'Special Event'
 
