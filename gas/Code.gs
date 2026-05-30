@@ -140,19 +140,24 @@ function generateSession(body) {
   }
   activeMembers.sort(function(a, b) { return a.fullName.localeCompare(b.fullName); });
 
-  for (var k = 0; k < activeMembers.length; k++) {
-    var m = activeMembers[k];
-    attendanceSheet.appendRow([
-      'A' + today + '-' + m.memberId,  // AttendanceID
-      sessionId,                        // SessionID
-      today,                            // SessionDate
-      m.memberId,                       // MemberID
-      m.fullName,                       // MemberName
-      m.ageGroup,                       // AgeGroup
-      false,                            // CheckedIn
-      '',                               // CheckedInAt
-      ''                                // Notes
-    ]);
+  // Build all attendance rows in memory, then write them in a single setValues call.
+  // appendRow per member is one network round-trip each — slow for large rosters.
+  if (activeMembers.length > 0) {
+    var rows = activeMembers.map(function(m) {
+      return [
+        'A' + today + '-' + m.memberId,  // AttendanceID
+        sessionId,                        // SessionID
+        today,                            // SessionDate
+        m.memberId,                       // MemberID
+        m.fullName,                       // MemberName
+        m.ageGroup,                       // AgeGroup
+        false,                            // CheckedIn
+        '',                               // CheckedInAt
+        ''                                // Notes
+      ];
+    });
+    var startRow = attendanceSheet.getLastRow() + 1;
+    attendanceSheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
   }
 
   return jsonResponse({ success: true, sessionId: sessionId, memberCount: activeMembers.length });
@@ -212,14 +217,19 @@ function getUncheckedMembers(body) {
 function checkIn(body) {
   var ss = getSpreadsheet();
   var attSheet = ss.getSheetByName('Attendance');
-  var attData  = attSheet.getDataRange().getValues();
 
-  for (var i = 1; i < attData.length; i++) {
-    if (attData[i][0] === body.attendanceId) {
-      var rowNum = i + 1;
-      attSheet.getRange(rowNum, 7).setValue(true);
-      attSheet.getRange(rowNum, 8).setValue(getManilaTimestamp());
-      attSheet.getRange(rowNum, 9).setValue(body.notes || '');
+  // Read only column A (AttendanceID) to find the row, not the whole sheet.
+  var lastRow = attSheet.getLastRow();
+  if (lastRow < 2) {
+    return jsonResponse({ success: false, error: 'Attendance record not found: ' + body.attendanceId });
+  }
+  var ids = attSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+  for (var i = 0; i < ids.length; i++) {
+    if (ids[i][0] === body.attendanceId) {
+      var rowNum = i + 2;
+      // Write CheckedIn, CheckedInAt, Notes (cols 7-9) in a single call.
+      attSheet.getRange(rowNum, 7, 1, 3).setValues([[true, getManilaTimestamp(), body.notes || '']]);
       return jsonResponse({ success: true });
     }
   }
