@@ -17,10 +17,11 @@ export default function HelpWizard({ title = 'How it works', steps }: Props) {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
 
-  // Reset to the first step whenever the wizard is reopened.
-  useEffect(() => {
-    if (open) setStep(0)
-  }, [open])
+  // Reset to the first step whenever the wizard is opened.
+  const openWizard = () => {
+    setStep(0)
+    setOpen(true)
+  }
 
   // Close on Escape for keyboard users.
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function HelpWizard({ title = 'How it works', steps }: Props) {
       {/* Floating help button */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openWizard}
         aria-label="Open help"
         className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#227EEE] text-2xl font-black text-white shadow-lg shadow-blue-300 transition hover:brightness-95 active:scale-95"
       >
