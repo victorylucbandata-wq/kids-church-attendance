@@ -11,8 +11,8 @@ const HELP_STEPS: HelpStep[] = [
   },
   {
     emoji: '🎨',
-    title: 'Pick the age group & service',
-    body: 'Choose your child\'s age group and the service you\'re attending so we can place them in the right class.',
+    title: 'Pick the age group & time slot',
+    body: 'Choose your child\'s age group and the time slot you\'re attending so we can place them in the right class.',
   },
   {
     emoji: '🍎',
@@ -26,34 +26,56 @@ const HELP_STEPS: HelpStep[] = [
   },
 ]
 
+const TIME_SLOTS = [
+  { value: '9am', label: '9:00 AM' },
+  { value: '11am', label: '11:00 AM' },
+  { value: 'Special', label: 'Special Event' },
+]
+
 type FirstTimerForm = {
   parentName: string
   contactNumber: string
-  childName: string
+  childFirstName: string
+  childLastName: string
+  childNickname: string
   age: string
   ageGroup: string
-  serviceSchedule: string
+  timeSlot: string
+  birthday: string
   notes: string
 }
 
 const initialForm: FirstTimerForm = {
   parentName: '',
   contactNumber: '',
-  childName: '',
+  childFirstName: '',
+  childLastName: '',
+  childNickname: '',
   age: '',
   ageGroup: '',
-  serviceSchedule: '',
+  timeSlot: '',
+  birthday: '',
   notes: '',
 }
 
 export default function FirstTimerPage() {
   const [form, setForm] = useState<FirstTimerForm>(initialForm)
+  const [ageGroups, setAgeGroups] = useState<{ id: string; name: string }[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)
   const [message, setMessage] = useState('')
   const [countdown, setCountdown] = useState(4)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    fetch('/api/age-groups')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.ageGroups) setAgeGroups(data.ageGroups)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -94,9 +116,10 @@ export default function FirstTimerPage() {
     if (
       !form.parentName ||
       !form.contactNumber ||
-      !form.childName ||
+      !form.childFirstName ||
+      !form.childLastName ||
       !form.ageGroup ||
-      !form.serviceSchedule
+      !form.timeSlot
     ) {
       setMessage('Please complete the required fields before checking in.')
       return
@@ -124,6 +147,10 @@ export default function FirstTimerPage() {
       setIsSubmitting(false)
     }
   }
+
+  const displayName = form.childNickname
+    ? `${form.childNickname} (${form.childLastName}, ${form.childFirstName})`
+    : `${form.childFirstName} ${form.childLastName}`
 
   const inputClass =
     'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
@@ -163,7 +190,7 @@ export default function FirstTimerPage() {
                 </div>
                 <p className="text-xl font-black text-green-800">Check-in successful!</p>
                 <p className="mt-2 text-sm leading-relaxed text-green-700">
-                  Thank you! {form.childName}&apos;s attendance has been recorded.
+                  Thank you! {displayName}&apos;s attendance has been recorded.
                 </p>
               </div>
 
@@ -175,10 +202,11 @@ export default function FirstTimerPage() {
                 <div className="space-y-2 rounded-2xl bg-white p-4 text-sm shadow-sm">
                   <p><span className="font-bold text-[#227EEE]">Parent:</span> {form.parentName}</p>
                   <p><span className="font-bold text-[#227EEE]">Contact:</span> {form.contactNumber}</p>
-                  <p><span className="font-bold text-[#227EEE]">Child:</span> {form.childName}</p>
+                  <p><span className="font-bold text-[#227EEE]">Child:</span> {displayName}</p>
+                  {form.birthday && <p><span className="font-bold text-[#227EEE]">Birthday:</span> {form.birthday}</p>}
                   {form.age && <p><span className="font-bold text-[#227EEE]">Age:</span> {form.age}</p>}
                   <p><span className="font-bold text-[#227EEE]">Group:</span> {form.ageGroup}</p>
-                  <p><span className="font-bold text-[#227EEE]">Service:</span> {form.serviceSchedule}</p>
+                  <p><span className="font-bold text-[#227EEE]">Time Slot:</span> {form.timeSlot}</p>
                   {form.notes && <p><span className="font-bold text-[#227EEE]">Notes:</span> {form.notes}</p>}
                 </div>
               </div>
@@ -210,12 +238,42 @@ export default function FirstTimerPage() {
               </label>
 
               <label className="block">
-                <span className={labelClass}>Child Name *</span>
+                <span className={labelClass}>Child First Name *</span>
                 <input
-                  value={form.childName}
-                  onChange={(e) => updateField('childName', e.target.value)}
+                  value={form.childFirstName}
+                  onChange={(e) => updateField('childFirstName', e.target.value)}
                   className={inputClass}
-                  placeholder="Enter child's name"
+                  placeholder="Enter first name"
+                />
+              </label>
+
+              <label className="block">
+                <span className={labelClass}>Child Last Name *</span>
+                <input
+                  value={form.childLastName}
+                  onChange={(e) => updateField('childLastName', e.target.value)}
+                  className={inputClass}
+                  placeholder="Enter last name"
+                />
+              </label>
+
+              <label className="block">
+                <span className={labelClass}>Nickname</span>
+                <input
+                  value={form.childNickname}
+                  onChange={(e) => updateField('childNickname', e.target.value)}
+                  className={inputClass}
+                  placeholder="What does your child go by?"
+                />
+              </label>
+
+              <label className="block">
+                <span className={labelClass}>Birthday</span>
+                <input
+                  type="date"
+                  value={form.birthday}
+                  onChange={(e) => updateField('birthday', e.target.value)}
+                  className={inputClass}
                 />
               </label>
 
@@ -237,22 +295,23 @@ export default function FirstTimerPage() {
                   className={inputClass}
                 >
                   <option value="">Select age group</option>
-                  <option value="Preschool">Preschool</option>
-                  <option value="Preteens">Preteens</option>
+                  {ageGroups.map((ag) => (
+                    <option key={ag.id} value={ag.name}>{ag.name}</option>
+                  ))}
                 </select>
               </label>
 
               <label className="block">
-                <span className={labelClass}>Service Schedule *</span>
+                <span className={labelClass}>Time Slot *</span>
                 <select
-                  value={form.serviceSchedule}
-                  onChange={(e) => updateField('serviceSchedule', e.target.value)}
+                  value={form.timeSlot}
+                  onChange={(e) => updateField('timeSlot', e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">Select service schedule</option>
-                  <option value="Sunday Morning">Sunday Morning</option>
-                  <option value="Sunday Afternoon">Sunday Afternoon</option>
-                  <option value="Special Event">Special Event</option>
+                  <option value="">Select time slot</option>
+                  {TIME_SLOTS.map((ts) => (
+                    <option key={ts.value} value={ts.value}>{ts.label}</option>
+                  ))}
                 </select>
               </label>
 
