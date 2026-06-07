@@ -2,6 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '➕',
+    title: 'Adding a new member',
+    body: 'Fill in the child\'s or volunteer\'s details. First name and last name are required — everything else is optional but helpful.',
+  },
+  {
+    emoji: '🎂',
+    title: 'Birthday',
+    body: 'Adding a birthday lets the system highlight their name on check-in day so volunteers can greet them!',
+  },
+  {
+    emoji: '👨‍👩‍👧',
+    title: 'Parent info',
+    body: 'Parent name and contact number help leaders reach the family if needed during service.',
+  },
+]
 
 type AgeGroup = { id: string; name: string }
 
@@ -150,6 +169,8 @@ export default function NewMemberPage() {
         </div>
 
       </div>
+
+      <HelpWizard title="New member guide" steps={HELP_STEPS} />
     </main>
   )
 }

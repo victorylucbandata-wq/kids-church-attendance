@@ -1,6 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '🏷️',
+    title: 'Age groups',
+    body: 'Age groups organize kids by age during check-in. Parents pick their child\'s age group before selecting a name.',
+  },
+  {
+    emoji: '➕',
+    title: 'Adding a group',
+    body: 'Type the name (e.g. "Primary", "Toddlers") and tap Add. New groups appear at the bottom of the list.',
+  },
+  {
+    emoji: '↕️',
+    title: 'Reorder and manage',
+    body: 'Use the ↑ ↓ arrows to change the display order. Tap Edit to rename, or Delete to remove (only if no members are assigned).',
+  },
+]
 
 type AgeGroup = { id: string; name: string; sort_order: number }
 
@@ -201,6 +220,8 @@ export default function AgeGroupsPage() {
         </div>
 
       </div>
+
+      <HelpWizard title="Age groups guide" steps={HELP_STEPS} />
     </main>
   )
 }

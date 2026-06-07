@@ -2,6 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '✏️',
+    title: 'Editing a member',
+    body: 'Update any of the member\'s details and tap "Save Changes". First name and last name are required.',
+  },
+  {
+    emoji: '🔄',
+    title: 'Active status',
+    body: 'Uncheck "Active Member" to hide them from the check-in list without deleting their record. You can reactivate them anytime.',
+  },
+  {
+    emoji: '🏷️',
+    title: 'Age group and role',
+    body: 'Change their age group as they grow up, or switch their role between child and volunteer.',
+  },
+]
 
 type AgeGroup = { id: string; name: string }
 
@@ -192,6 +211,8 @@ export default function EditMemberPage() {
         </div>
 
       </div>
+
+      <HelpWizard title="Edit member guide" steps={HELP_STEPS} />
     </main>
   )
 }
