@@ -2,6 +2,30 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '👥',
+    title: 'Member list',
+    body: 'This page shows all registered kids and volunteers. Use the search bar and filters to find someone quickly.',
+  },
+  {
+    emoji: '🔍',
+    title: 'Search and filter',
+    body: 'Type a name to search. Filter by role (child/volunteer), age group, or active status. Results update instantly.',
+  },
+  {
+    emoji: '✏️',
+    title: 'Edit a member',
+    body: 'Tap a member\'s name to open their profile and update their details — name, birthday, age group, parent info, and more.',
+  },
+  {
+    emoji: '➕',
+    title: 'Add a member',
+    body: 'Tap "+ Add Member" to register a new child or volunteer. Fill in their details and they\'ll appear in the check-in list.',
+  },
+]
 
 type Member = {
   id: string
@@ -195,6 +219,8 @@ export default function MembersPage() {
         )}
 
       </div>
+
+      <HelpWizard title="Members guide" steps={HELP_STEPS} />
     </main>
   )
 }

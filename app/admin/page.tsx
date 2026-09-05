@@ -59,7 +59,7 @@ export default async function AdminPage() {
           firstName: m.first_name,
           lastName: m.last_name,
           nickname: m.nickname,
-          ageGroup: ageGroupObj?.name ?? '',
+          ageGroup: ageGroupObj?.name ?? (m.role === 'volunteer' ? 'Serve Team' : ''),
           role: m.role as 'child' | 'volunteer',
           timeSlot: a?.time_slot ?? null,
           checkedIn: a?.checked_in ?? false,

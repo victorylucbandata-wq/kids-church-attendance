@@ -10,22 +10,27 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '👋',
     title: 'What this page is for',
-    body: 'This is the leader page. Use it to open check-in for the day and watch who has arrived. Parents can\'t check anyone in until you start a session here.',
+    body: 'This is the leader page. Use it to open check-in for the day, watch who has arrived, and check kids out when parents pick them up.',
   },
   {
     emoji: '▶️',
-    title: 'Step 1 — Start the session',
-    body: 'Tap Generate to create today\'s session. Do this once at the start of the day.',
+    title: 'Start the session',
+    body: 'Tap Generate to create today\'s session. Do this once at the start of the day. Parents can\'t check in until a session is active.',
   },
   {
     emoji: '📊',
-    title: 'Step 2 — Watch the numbers',
-    body: 'The cards show Total Members, Checked In, and Not Yet In. They auto-refresh every 20 seconds.',
+    title: 'Watch the numbers',
+    body: 'The summary cards show Checked In, Still Here, and Checked Out. Use the filter tabs (All / Still Here / Out) to quickly see who\'s still in the building.',
   },
   {
-    emoji: '🧒',
-    title: 'Step 3 — Check the lists',
-    body: 'The Member Attendance table shows who\'s in and at what time. First Timers shows new kids registered today, with parent contact and any allergy notes.',
+    emoji: '👋',
+    title: 'Checking kids out',
+    body: 'Tap "Check Out" next to a child\'s name when their parent picks them up. Use "Check Out All" at the end of service to mark everyone as picked up.',
+  },
+  {
+    emoji: '🎂',
+    title: 'Birthday highlights',
+    body: 'Kids with birthdays today or this week are highlighted with a cake icon — both here and on the check-in screen so volunteers can greet them!',
   },
   {
     emoji: '🔒',
@@ -199,6 +204,9 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           </a>
           <a href="/admin/age-groups" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
             Age Groups
+          </a>
+          <a href="/admin/sessions" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+            Past Sessions
           </a>
         </div>
 
