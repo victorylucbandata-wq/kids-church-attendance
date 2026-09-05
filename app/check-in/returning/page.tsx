@@ -9,7 +9,7 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🎨',
     title: 'Step 1 — Pick the age group',
-    body: 'Tap your child\'s age group. Only groups with kids still to check in are shown.',
+    body: 'Tap your child\'s age group — or Serve Team if you are volunteering. Only groups with people still to check in are shown.',
   },
   {
     emoji: '🙋',
@@ -82,10 +82,12 @@ export default function ReturningPage() {
   }, [])
 
   const PAGE_SIZE = 10
+  const SERVE_TEAM = 'Serve Team'
+  const groupOf = (m: { ageGroup: string }) => m.ageGroup || SERVE_TEAM
 
   const membersInGroup =
     loadState.status === 'ready'
-      ? loadState.members.filter((m) => m.ageGroup === selectedGroup)
+      ? loadState.members.filter((m) => groupOf(m) === selectedGroup)
       : []
 
   const sortedMembers = [...membersInGroup].sort((a, b) =>
@@ -103,12 +105,15 @@ export default function ReturningPage() {
 
   const activeGroups =
     loadState.status === 'ready'
-      ? [...new Set(loadState.members.map((m) => m.ageGroup))].filter(Boolean).sort()
+      ? [...new Set(loadState.members.map(groupOf))].sort(
+          (a, b) => Number(a === SERVE_TEAM) - Number(b === SERVE_TEAM) || a.localeCompare(b)
+        )
       : []
 
   const GROUP_EMOJIS: Record<string, string> = {
     'Preschool': '🎨',
     'Preteens': '🧒',
+    [SERVE_TEAM]: '🙌',
   }
 
   const handleTimeSlotSelect = (slot: string) => {
@@ -177,7 +182,7 @@ export default function ReturningPage() {
 
       setLoadState({ status: 'ready', members: remaining, sessionId: loadState.sessionId })
 
-      const stillInGroup = remaining.some((m) => m.ageGroup === selectedGroup)
+      const stillInGroup = remaining.some((m) => groupOf(m) === selectedGroup)
       if (!stillInGroup) {
         setStep('group-select')
       }
@@ -197,7 +202,9 @@ export default function ReturningPage() {
       ? 'Select the service time.'
       : step === 'group-select'
         ? 'Select your child\'s age group.'
-        : `${selectedGroup} — tap your child's name.`
+        : selectedGroup === SERVE_TEAM
+          ? `${SERVE_TEAM} — tap your name.`
+          : `${selectedGroup} — tap your child's name.`
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6 text-slate-900">
@@ -286,7 +293,7 @@ export default function ReturningPage() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {activeGroups.map((group) => {
-                const count = loadState.members.filter((m) => m.ageGroup === group).length
+                const count = loadState.members.filter((m) => groupOf(m) === group).length
                 return (
                   <button
                     key={group}
@@ -295,7 +302,9 @@ export default function ReturningPage() {
                   >
                     <span className="text-3xl">{GROUP_EMOJIS[group] ?? '👦'}</span>
                     <span className="font-black text-slate-800 text-sm">{group}</span>
-                    <span className="text-xs text-slate-400">{count} kid{count !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-slate-400">
+                      {count} {group === SERVE_TEAM ? 'serving' : `kid${count !== 1 ? 's' : ''}`}
+                    </span>
                   </button>
                 )
               })}
@@ -317,7 +326,7 @@ export default function ReturningPage() {
 
             {/* Count */}
             <p className="text-center text-xs font-bold text-slate-400">
-              {filteredMembers.length} kid{filteredMembers.length !== 1 ? 's' : ''}
+              {filteredMembers.length}{selectedGroup === SERVE_TEAM ? ' serving' : ` kid${filteredMembers.length !== 1 ? 's' : ''}`}
               {search ? ' found' : ''}
               {totalPages > 1 ? ` · Page ${page + 1} of ${totalPages}` : ''}
             </p>

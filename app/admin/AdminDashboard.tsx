@@ -205,6 +205,9 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           <a href="/admin/age-groups" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
             Age Groups
           </a>
+          <a href="/admin/sessions" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+            Past Sessions
+          </a>
         </div>
 
         {/* Error state */}
