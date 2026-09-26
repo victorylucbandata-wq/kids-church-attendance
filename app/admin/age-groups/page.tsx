@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import { inputClass } from '@/app/lib/ui'
+import { requestJson } from '@/app/lib/api'
+import Notice from '@/app/components/Notice'
+import Link from 'next/link'
+import Decor from '@/app/components/Decor'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -23,127 +28,116 @@ const HELP_STEPS: HelpStep[] = [
 
 type AgeGroup = { id: string; name: string; sort_order: number }
 
+const fetchAgeGroups = () => requestJson<{ ageGroups: AgeGroup[] }>('/api/admin/age-groups')
+
 export default function AgeGroupsPage() {
   const [groups, setGroups] = useState<AgeGroup[]>([])
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
-  const [message, setMessage] = useState('')
+  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
 
-  const load = () => {
-    fetch('/api/admin/age-groups').then(r => r.json()).then(d => {
-      if (d.success) setGroups(d.ageGroups)
-      setLoading(false)
-    })
+  const flash = (kind: 'success' | 'error', text: string) => {
+    setNotice({ kind, text })
+    if (kind === 'success') setTimeout(() => setNotice(null), 3000)
   }
 
-  useEffect(() => { load() }, [])
+  const showLoaded = (res: Awaited<ReturnType<typeof fetchAgeGroups>>) => {
+    if (res.ok) setGroups(res.data.ageGroups)
+    else flash('error', `Couldn't load age groups. ${res.error}`)
+    setLoading(false)
+  }
 
-  const flash = (msg: string) => {
-    setMessage(msg)
-    setTimeout(() => setMessage(''), 3000)
+  const load = async () => showLoaded(await fetchAgeGroups())
+
+  useEffect(() => {
+    fetchAgeGroups().then((res) => {
+      if (res.ok) setGroups(res.data.ageGroups)
+      else setNotice({ kind: 'error', text: `Couldn't load age groups. ${res.error}` })
+      setLoading(false)
+    })
+  }, [])
+
+  // Runs one change, reloads the list, and reports the outcome.
+  const mutate = async (url: string, method: string, body: unknown, success: string) => {
+    setBusy(true)
+    setNotice(null)
+    const res = await requestJson(url, { method, body })
+    setBusy(false)
+    if (!res.ok) {
+      flash('error', res.error)
+      return false
+    }
+    await load()
+    flash('success', success)
+    return true
   }
 
   const handleAdd = async () => {
-    if (!newName.trim()) return
-    const res = await fetch('/api/admin/age-groups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim() }),
-    })
-    const data = await res.json()
-    if (data.success) {
-      setNewName('')
-      load()
-      flash('Age group added.')
-    } else {
-      flash(data.error)
-    }
+    const name = newName.trim()
+    if (!name) return
+    if (await mutate('/api/admin/age-groups', 'POST', { name }, `Added “${name}”.`)) setNewName('')
   }
 
   const handleRename = async (id: string) => {
-    if (!editName.trim()) return
-    const res = await fetch(`/api/admin/age-groups/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editName.trim() }),
-    })
-    const data = await res.json()
-    if (data.success) {
-      setEditingId(null)
-      load()
-      flash('Renamed.')
-    } else {
-      flash(data.error)
-    }
+    const name = editName.trim()
+    if (!name) return
+    if (await mutate(`/api/admin/age-groups/${id}`, 'PUT', { name }, `Renamed to “${name}”.`)) setEditingId(null)
   }
 
-  const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/admin/age-groups/${id}`, { method: 'DELETE' })
-    const data = await res.json()
-    if (data.success) {
-      load()
-      flash('Deleted.')
-    } else {
-      flash(data.error)
-    }
+  const handleDelete = async (group: AgeGroup) => {
+    if (!confirm(`Delete the “${group.name}” age group? This can't be undone.`)) return
+    await mutate(`/api/admin/age-groups/${group.id}`, 'DELETE', undefined, `Deleted “${group.name}”.`)
   }
 
   const handleMove = async (id: string, direction: 'up' | 'down') => {
     const idx = groups.findIndex(g => g.id === id)
-    if (idx < 0) return
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= groups.length) return
+    if (idx < 0 || swapIdx < 0 || swapIdx >= groups.length) return
 
     const a = groups[idx]
     const b = groups[swapIdx]
 
-    await Promise.all([
-      fetch(`/api/admin/age-groups/${a.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sort_order: b.sort_order }),
-      }),
-      fetch(`/api/admin/age-groups/${b.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sort_order: a.sort_order }),
-      }),
+    setBusy(true)
+    setNotice(null)
+    const results = await Promise.all([
+      requestJson(`/api/admin/age-groups/${a.id}`, { method: 'PUT', body: { sort_order: b.sort_order } }),
+      requestJson(`/api/admin/age-groups/${b.id}`, { method: 'PUT', body: { sort_order: a.sort_order } }),
     ])
-    load()
+    setBusy(false)
+    const failed = results.find(r => !r.ok)
+    if (failed && !failed.ok) flash('error', `Couldn't reorder. ${failed.error}`)
+    await load()
   }
 
-  const inputClass = 'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6">
-      <div className="mx-auto max-w-md space-y-4">
+    <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
+      <Decor />
+      <div className="relative mx-auto max-w-md space-y-4">
 
         <div className="flex gap-2">
-          <a href="/admin" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          <Link href="/admin" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             ← Dashboard
-          </a>
-          <a href="/admin/members" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          </Link>
+          <Link href="/admin/members" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Members
-          </a>
+          </Link>
         </div>
 
         <div className="text-center">
-          <h1 className="text-2xl font-black text-slate-900">Age Groups</h1>
+          <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">🏷️</span>Age Groups</h1>
         </div>
 
-        {message && (
-          <div className="rounded-2xl bg-green-500 px-4 py-2 text-center text-sm font-black text-white">
-            {message}
-          </div>
-        )}
+        {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
 
         {/* Add new */}
-        <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-lg shadow-blue-100/50 space-y-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Add New</p>
+        <div className="card p-4 space-y-3">
+          <label htmlFor="new-age-group" className="block text-sm font-bold text-slate-700">Add a new age group</label>
           <div className="flex gap-2">
             <input
+              id="new-age-group"
               value={newName}
               onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -152,8 +146,8 @@ export default function AgeGroupsPage() {
             />
             <button
               onClick={handleAdd}
-              disabled={!newName.trim()}
-              className="rounded-2xl bg-[#227EEE] px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:brightness-95 disabled:opacity-40 whitespace-nowrap"
+              disabled={!newName.trim() || busy}
+              className="rounded-2xl bg-brand px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-40 whitespace-nowrap"
             >
               Add
             </button>
@@ -161,11 +155,11 @@ export default function AgeGroupsPage() {
         </div>
 
         {/* List */}
-        <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-lg shadow-blue-100/50 space-y-2">
-          {loading && <p className="text-center text-sm text-slate-400 py-4">Loading…</p>}
+        <div className="card p-4 space-y-2">
+          {loading && <p className="text-center text-sm text-slate-500 py-4">Loading…</p>}
 
           {!loading && groups.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-4">No age groups yet.</p>
+            <p className="text-center text-sm text-slate-500 py-4">No age groups yet.</p>
           )}
 
           {groups.map((g, i) => (
@@ -176,11 +170,12 @@ export default function AgeGroupsPage() {
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleRename(g.id)}
-                    className="flex-1 rounded-xl border-2 border-blue-200 px-3 py-1.5 text-sm outline-none"
+                    aria-label="Age group name"
+                    className="min-w-0 flex-1 rounded-xl border-2 border-blue-200 px-3 py-2 text-base outline-none focus:border-brand"
                     autoFocus
                   />
-                  <button onClick={() => handleRename(g.id)} className="text-xs font-bold text-[#227EEE]">Save</button>
-                  <button onClick={() => setEditingId(null)} className="text-xs font-bold text-slate-400">Cancel</button>
+                  <button onClick={() => handleRename(g.id)} className="min-h-11 px-2 text-sm font-bold text-brand">Save</button>
+                  <button onClick={() => setEditingId(null)} className="min-h-11 px-2 text-sm font-bold text-slate-600">Cancel</button>
                 </>
               ) : (
                 <>
@@ -188,27 +183,30 @@ export default function AgeGroupsPage() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleMove(g.id, 'up')}
-                      disabled={i === 0}
-                      className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-blue-50 disabled:opacity-20"
+                      aria-label={`Move ${g.name} up`}
+                      disabled={i === 0 || busy}
+                      className="min-h-11 min-w-11 rounded-lg px-2 text-base text-slate-600 hover:bg-blue-50 disabled:opacity-20"
                     >
                       ↑
                     </button>
                     <button
                       onClick={() => handleMove(g.id, 'down')}
-                      disabled={i === groups.length - 1}
-                      className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-blue-50 disabled:opacity-20"
+                      aria-label={`Move ${g.name} down`}
+                      disabled={i === groups.length - 1 || busy}
+                      className="min-h-11 min-w-11 rounded-lg px-2 text-base text-slate-600 hover:bg-blue-50 disabled:opacity-20"
                     >
                       ↓
                     </button>
                     <button
                       onClick={() => { setEditingId(g.id); setEditName(g.name) }}
-                      className="rounded-lg px-2 py-1 text-xs font-bold text-[#227EEE] hover:bg-blue-50"
+                      className="min-h-11 rounded-lg px-3 text-sm font-bold text-brand hover:bg-blue-50"
                     >
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDelete(g.id)}
-                      className="rounded-lg px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-50"
+                      onClick={() => handleDelete(g)}
+                      disabled={busy}
+                      className="min-h-11 rounded-lg px-3 text-sm font-bold text-red-700 hover:bg-red-50"
                     >
                       Delete
                     </button>

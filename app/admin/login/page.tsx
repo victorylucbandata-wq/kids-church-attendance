@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { inputClass } from '@/app/lib/ui'
+import Link from 'next/link'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -38,10 +40,10 @@ export default function AdminLoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4">
-      <div className="w-full max-w-sm rounded-[2rem] border border-blue-100 bg-white p-8 shadow-xl shadow-blue-100/70">
+      <div className="w-full max-w-sm card p-8">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#227EEE] text-2xl shadow-lg shadow-blue-200">
-            🔐
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl shadow-lg shadow-blue-200">
+            <span aria-hidden="true">🔐</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900">Admin Access</h1>
           <p className="mt-1 text-sm text-slate-500">Kids Church Attendance</p>
@@ -54,7 +56,7 @@ export default function AdminLoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100"
+              className={inputClass}
               placeholder="Enter admin password"
               autoFocus
             />
@@ -69,16 +71,16 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={isLoading || !password}
-            className="w-full rounded-2xl bg-[#227EEE] px-4 py-3 font-black text-white shadow-lg shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
+            className="w-full rounded-2xl bg-brand px-4 py-3 font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
           >
             {isLoading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <a href="/" className="text-sm font-bold text-slate-400 hover:text-slate-600">
+          <Link href="/" className="inline-block px-4 py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
             ← Back to Check-In
-          </a>
+          </Link>
         </div>
       </div>
     </main>

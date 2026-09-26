@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
+/* Light-only on purpose: the kiosk is used in a bright church lobby. */
+@theme {
+  /* Brand blue, darkened from #227EEE so white text passes 4.5:1 (5.1:1). */
+  --color-brand: #1a6bd6;
+  --color-brand-strong: #1558b3;
+  --font-sans: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+}
+
+/* The one surface every page is built from. */
+@utility card {
+  border-radius: 2rem;
+  border: 1px solid var(--color-blue-100);
+  background: #fff;
+  box-shadow: 0 10px 25px -8px rgb(191 219 254 / 0.7);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #fff;
+  color: var(--color-slate-900);
+}
+
+::selection {
+  background: var(--color-yellow-200);
+  color: var(--color-slate-900);
+}
+
+/* Form fields draw their own focus ring (see app/lib/ui.ts). */
+:focus-visible:not(input, select, textarea) {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-slate-500);
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
 }

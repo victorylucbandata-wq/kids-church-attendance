@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import { inputClass, labelClass } from '@/app/lib/ui'
+import { requestJson } from '@/app/lib/api'
+import Notice from '@/app/components/Notice'
+import Link from 'next/link'
+import Decor from '@/app/components/Decor'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -23,6 +28,11 @@ const HELP_STEPS: HelpStep[] = [
 ]
 
 type AgeGroup = { id: string; name: string }
+
+// The API returns nulls for empty optional fields.
+type MemberRecord = {
+  [K in keyof MemberForm]: MemberForm[K] extends string ? string | null : MemberForm[K]
+}
 
 type MemberForm = {
   first_name: string
@@ -50,21 +60,21 @@ export default function EditMemberPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/admin/members/${id}`).then(r => r.json()),
-      fetch('/api/admin/age-groups').then(r => r.json()),
+      requestJson<{ member: MemberRecord }>(`/api/admin/members/${id}`),
+      requestJson<{ ageGroups: AgeGroup[] }>('/api/admin/age-groups'),
     ]).then(([memberRes, agRes]) => {
-      if (!memberRes.success) {
-        setLoadError(memberRes.error || 'Member not found.')
+      if (!memberRes.ok) {
+        setLoadError(memberRes.error)
         return
       }
-      if (agRes.success) setAgeGroups(agRes.ageGroups)
-      const m = memberRes.member
+      if (agRes.ok) setAgeGroups(agRes.data.ageGroups)
+      const m = memberRes.data.member
       setForm({
-        first_name: m.first_name,
-        last_name: m.last_name,
+        first_name: m.first_name ?? '',
+        last_name: m.last_name ?? '',
         nickname: m.nickname ?? '',
         birthday: m.birthday ?? '',
-        role: m.role,
+        role: m.role ?? 'child',
         age_group_id: m.age_group_id ?? '',
         parent_name: m.parent_name ?? '',
         contact_number: m.contact_number ?? '',
@@ -80,36 +90,30 @@ export default function EditMemberPage() {
 
   const handleSubmit = async () => {
     if (!form || !form.first_name || !form.last_name) {
-      setMessage('First name and last name are required.')
+      setMessage('Please fill in both first name and last name.')
       return
     }
     setSaving(true)
     setMessage('')
 
-    const res = await fetch(`/api/admin/members/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const data = await res.json()
-
-    if (data.success) {
+    const res = await requestJson(`/api/admin/members/${id}`, { method: 'PUT', body: form })
+    if (res.ok) {
       router.push('/admin/members')
     } else {
-      setMessage(data.error || 'Failed to update member.')
+      setMessage(res.error)
       setSaving(false)
     }
   }
-
-  const inputClass = 'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
-  const labelClass = 'mb-1.5 block text-sm font-bold text-slate-700'
 
   if (loadError) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 flex items-center justify-center px-4">
         <div className="text-center space-y-3">
-          <p className="font-black text-red-700">{loadError}</p>
-          <a href="/admin/members" className="text-sm font-bold text-[#227EEE]">← Back to Members</a>
+          <p role="alert" className="font-black text-red-700">Couldn&apos;t load this member. {loadError}</p>
+          <button type="button" onClick={() => window.location.reload()} className="min-h-11 rounded-2xl bg-brand px-6 py-3 text-sm font-black text-white transition hover:bg-brand-strong">
+            Try again
+          </button>
+          <Link href="/admin/members" className="inline-block py-3 text-sm font-bold text-brand">← Back to Members</Link>
         </div>
       </main>
     )
@@ -118,30 +122,31 @@ export default function EditMemberPage() {
   if (!form) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 flex items-center justify-center">
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p role="status" className="text-sm text-slate-600">Loading member…</p>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6">
-      <div className="mx-auto max-w-md">
-        <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-xl shadow-blue-100/70 space-y-4">
+    <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
+      <Decor />
+      <div className="relative mx-auto max-w-md">
+        <div className="card p-6 space-y-4">
           <div className="mb-2">
-            <a href="/admin/members" className="text-sm font-bold text-[#227EEE] hover:underline">← Back to Members</a>
+            <Link href="/admin/members" className="inline-block py-3 text-sm font-bold text-brand hover:underline">← Back to Members</Link>
           </div>
           <div className="text-center mb-2">
-            <h1 className="text-2xl font-black text-slate-900">Edit Member</h1>
+            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">✏️</span>Edit Member</h1>
           </div>
 
           <label className="block">
-            <span className={labelClass}>First Name *</span>
-            <input value={form.first_name} onChange={e => update('first_name', e.target.value)} className={inputClass} />
+            <span className={labelClass}>First Name<span aria-hidden="true" className="text-red-700"> *</span></span>
+            <input value={form.first_name} onChange={e => update('first_name', e.target.value)} className={inputClass} required autoComplete="off" />
           </label>
 
           <label className="block">
-            <span className={labelClass}>Last Name *</span>
-            <input value={form.last_name} onChange={e => update('last_name', e.target.value)} className={inputClass} />
+            <span className={labelClass}>Last Name<span aria-hidden="true" className="text-red-700"> *</span></span>
+            <input value={form.last_name} onChange={e => update('last_name', e.target.value)} className={inputClass} required autoComplete="off" />
           </label>
 
           <label className="block">
@@ -179,7 +184,7 @@ export default function EditMemberPage() {
 
           <label className="block">
             <span className={labelClass}>Contact Number</span>
-            <input value={form.contact_number} onChange={e => update('contact_number', e.target.value)} className={inputClass} />
+            <input value={form.contact_number} onChange={e => update('contact_number', e.target.value)} className={inputClass} type="tel" inputMode="tel" />
           </label>
 
           <label className="block">
@@ -192,19 +197,19 @@ export default function EditMemberPage() {
               type="checkbox"
               checked={form.is_active}
               onChange={e => update('is_active', e.target.checked)}
-              className="h-5 w-5 rounded accent-[#227EEE]"
+              className="h-5 w-5 rounded accent-brand"
             />
             <span className="text-sm font-bold text-slate-700">Active Member</span>
           </label>
 
           {message && (
-            <p className="rounded-2xl bg-red-50 p-3 text-center text-sm font-bold text-red-700">{message}</p>
+            <Notice kind="error">{message}</Notice>
           )}
 
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="w-full rounded-2xl bg-[#227EEE] px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
+            className="w-full rounded-2xl bg-brand px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Save Changes'}
           </button>

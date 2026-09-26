@@ -1,0 +1,521 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T19:07:06+00:00",
+  "title": "Design System: Kids Church Check-In",
+  "extensions": {
+    "colorMeta": {
+      "sunday-blue": {
+        "role": "primary",
+        "displayName": "Sunday Blue",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "sunday-blue-deep": {
+        "role": "primary",
+        "displayName": "Sunday Blue Deep",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "body-ink": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "quiet-ink": {
+        "role": "neutral",
+        "displayName": "Quiet Ink",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "whisper-ink": {
+        "role": "neutral",
+        "displayName": "Whisper Ink",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Line",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "morning-tint": {
+        "role": "neutral",
+        "displayName": "Morning Tint",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "canvas-sky": {
+        "role": "neutral",
+        "displayName": "Canvas Sky",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "canvas-sun": {
+        "role": "neutral",
+        "displayName": "Canvas Sun",
+        "tonalRamp": [
+          "#422006",
+          "#713f12",
+          "#854d0e",
+          "#a16207",
+          "#eab308",
+          "#fde047",
+          "#fef08a",
+          "#fefce8"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f1f5f9"
+        ]
+      },
+      "sunshine": {
+        "role": "tertiary",
+        "displayName": "Sunshine",
+        "tonalRamp": [
+          "#422006",
+          "#713f12",
+          "#854d0e",
+          "#a16207",
+          "#eab308",
+          "#fde047",
+          "#fef08a",
+          "#fefce8"
+        ]
+      },
+      "cloud": {
+        "role": "tertiary",
+        "displayName": "Cloud",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1558b3",
+          "#1a6bd6",
+          "#60a5fa",
+          "#bfdbfe",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "bubblegum": {
+        "role": "tertiary",
+        "displayName": "Bubblegum",
+        "tonalRamp": [
+          "#500724",
+          "#831843",
+          "#9d174d",
+          "#be185d",
+          "#ec4899",
+          "#f9a8d4",
+          "#fbcfe8",
+          "#fdf2f8"
+        ]
+      },
+      "all-good-green": {
+        "role": "success",
+        "displayName": "All-Good Green",
+        "tonalRamp": [
+          "#052e16",
+          "#14532d",
+          "#166534",
+          "#15803d",
+          "#22c55e",
+          "#86efac",
+          "#bbf7d0",
+          "#f0fdf4"
+        ]
+      },
+      "all-good-tint": {
+        "role": "success",
+        "displayName": "All-Good Tint",
+        "tonalRamp": [
+          "#052e16",
+          "#14532d",
+          "#166534",
+          "#15803d",
+          "#22c55e",
+          "#86efac",
+          "#bbf7d0",
+          "#f0fdf4"
+        ]
+      },
+      "oops-red": {
+        "role": "error",
+        "displayName": "Oops Red",
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#ef4444",
+          "#fca5a5",
+          "#fecaca",
+          "#fef2f2"
+        ]
+      },
+      "oops-tint": {
+        "role": "error",
+        "displayName": "Oops Tint",
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#ef4444",
+          "#fca5a5",
+          "#fecaca",
+          "#fef2f2"
+        ]
+      },
+      "birthday-gold": {
+        "role": "secondary",
+        "displayName": "Birthday Gold",
+        "tonalRamp": [
+          "#422006",
+          "#713f12",
+          "#854d0e",
+          "#a16207",
+          "#eab308",
+          "#fde047",
+          "#fef08a",
+          "#fefce8"
+        ]
+      },
+      "birthday-tint": {
+        "role": "secondary",
+        "displayName": "Birthday Tint",
+        "tonalRamp": [
+          "#422006",
+          "#713f12",
+          "#854d0e",
+          "#a16207",
+          "#eab308",
+          "#fde047",
+          "#fef08a",
+          "#fefce8"
+        ]
+      },
+      "pickup-orange": {
+        "role": "secondary",
+        "displayName": "Pickup Orange",
+        "tonalRamp": [
+          "#431407",
+          "#7c2d12",
+          "#9a3412",
+          "#c2410c",
+          "#f97316",
+          "#fdba74",
+          "#fed7aa",
+          "#fff7ed"
+        ]
+      },
+      "pickup-tint": {
+        "role": "secondary",
+        "displayName": "Pickup Tint",
+        "tonalRamp": [
+          "#431407",
+          "#7c2d12",
+          "#9a3412",
+          "#c2410c",
+          "#f97316",
+          "#fdba74",
+          "#fed7aa",
+          "#fff7ed"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page greeting: Check-In Time!, Welcome Back!, First Timer!"
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Admin page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card headings, primary button labels, choice tiles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Instructions and help text; every form field (16px keeps iOS from zooming)."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, secondary buttons, notices, sentence-case section labels."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Timestamps, counts, badges only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-lift",
+        "value": "0 10px 25px -8px rgb(191 219 254 / 0.7)",
+        "purpose": "Every card surface."
+      },
+      {
+        "name": "button-lift",
+        "value": "0 10px 15px -3px #bfdbfe, 0 4px 6px -4px #bfdbfe",
+        "purpose": "Primary buttons and choice tiles."
+      },
+      {
+        "name": "dialog-float",
+        "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
+        "purpose": "Native dialogs, over a rgb(15 23 42 / 0.45) backdrop."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1) 150ms",
+        "purpose": "Hover and colour transitions (Tailwind default)."
+      },
+      {
+        "name": "press",
+        "value": "scale(0.97–0.98)",
+        "purpose": "Tap feedback on tiles and primary buttons; disabled under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one thing to tap next: Check In, Sign In, Next, Save.",
+      "html": "<button class=\"ds-btn-primary\">Check In</button>",
+      "css": ".ds-btn-primary { font-family: Nunito, ui-rounded, system-ui, sans-serif; background: #1a6bd6; color: #fff; font-size: 1.125rem; font-weight: 900; padding: 16px; min-height: 44px; width: 100%; border: none; border-radius: 1rem; box-shadow: 0 10px 15px -3px #bfdbfe, 0 4px 6px -4px #bfdbfe; cursor: pointer; transition: background .15s, transform .15s; } .ds-btn-primary:hover { background: #1558b3; } .ds-btn-primary:active { transform: scale(.98); } .ds-btn-primary:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-primary:active { transform: none; } }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Navigation pills and toggles.",
+      "html": "<button class=\"ds-btn-secondary\">Members</button>",
+      "css": ".ds-btn-secondary { font-family: Nunito, ui-rounded, system-ui, sans-serif; background: #fff; color: #1a6bd6; font-size: .875rem; font-weight: 900; padding: 10px 16px; min-height: 44px; border: 2px solid #dbeafe; border-radius: 1rem; cursor: pointer; transition: background .15s; } .ds-btn-secondary:hover { background: #eff6ff; } .ds-btn-secondary:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Check Out Button",
+      "kind": "button",
+      "refersTo": "button-checkout",
+      "description": "Per-child pickup action on the admin attendance list.",
+      "html": "<button class=\"ds-btn-checkout\">Check Out</button>",
+      "css": ".ds-btn-checkout { font-family: Nunito, ui-rounded, system-ui, sans-serif; background: #fff7ed; color: #9a3412; font-size: .875rem; font-weight: 900; padding: 8px 12px; min-height: 44px; border: 2px solid #fed7aa; border-radius: .75rem; cursor: pointer; transition: background .15s; } .ds-btn-checkout:hover { background: #ffedd5; } .ds-btn-checkout:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Choice Tile",
+      "kind": "custom",
+      "refersTo": "button-primary",
+      "description": "Signature parent-facing option: big, rounded, with an emoji.",
+      "html": "<a class=\"ds-tile\" href=\"#\"><span><strong>Returning Member</strong><small>Already registered? Tap here.</small></span><span aria-hidden=\"true\" class=\"ds-tile-emoji\">👋</span></a>",
+      "css": ".ds-tile { font-family: Nunito, ui-rounded, system-ui, sans-serif; display: flex; align-items: center; justify-content: space-between; min-height: 80px; padding: 20px 24px; background: #1a6bd6; color: #fff; border-radius: 1rem; text-decoration: none; box-shadow: 0 10px 15px -3px #bfdbfe; transition: background .15s, transform .15s; } .ds-tile strong { display: block; font-size: 1.125rem; font-weight: 900; } .ds-tile small { display: block; font-size: .875rem; color: #eff6ff; } .ds-tile-emoji { font-size: 1.875rem; } .ds-tile:hover { background: #1558b3; } .ds-tile:active { transform: scale(.98); } .ds-tile:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "inputClass with labelClass above it.",
+      "html": "<label class=\"ds-field\"><span>Contact Number <span aria-hidden=\"true\" class=\"ds-req\">*</span></span><input type=\"tel\" placeholder=\"09XXXXXXXXX\" required></label>",
+      "css": ".ds-field { font-family: Nunito, ui-rounded, system-ui, sans-serif; display: block; } .ds-field > span { display: block; margin-bottom: 6px; font-size: .875rem; font-weight: 700; color: #334155; } .ds-req { color: #b91c1c; } .ds-field input { font-family: Nunito, ui-rounded, system-ui, sans-serif; width: 100%; box-sizing: border-box; padding: 12px 16px; font-size: 1rem; color: #1e293b; background: #fff; border: 2px solid #dbeafe; border-radius: 1rem; outline: none; transition: border-color .15s, box-shadow .15s; } .ds-field input::placeholder { color: #64748b; } .ds-field input:focus { border-color: #1a6bd6; box-shadow: 0 0 0 4px #dbeafe; } .ds-field input[aria-invalid=true] { border-color: #f87171; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The one surface: pillowy white with a Cloud-tinted lift and a sunshine circle.",
+      "html": "<div class=\"ds-card\"><div aria-hidden=\"true\" class=\"ds-card-sun\"></div><h3>Today's Session</h3><p>No session generated yet for today.</p></div>",
+      "css": ".ds-card { font-family: Nunito, ui-rounded, system-ui, sans-serif; position: relative; overflow: hidden; padding: 24px; background: #fff; border: 1px solid #dbeafe; border-radius: 2rem; box-shadow: 0 10px 25px -8px rgb(191 219 254 / .7); } .ds-card-sun { position: absolute; left: -32px; top: -32px; width: 96px; height: 96px; border-radius: 9999px; background: rgb(254 240 138 / .7); } .ds-card h3 { position: relative; margin: 0 0 8px; font-size: 1.125rem; font-weight: 900; color: #1e293b; } .ds-card p { position: relative; margin: 0; font-size: .875rem; color: #475569; }"
+    },
+    {
+      "name": "Error Notice",
+      "kind": "custom",
+      "refersTo": "notice-error",
+      "description": "Announced error that says what failed and how to recover.",
+      "html": "<p role=\"alert\" class=\"ds-notice-error\">Could not reach the server. Check your connection and try again.</p>",
+      "css": ".ds-notice-error { font-family: Nunito, ui-rounded, system-ui, sans-serif; margin: 0; padding: 12px; text-align: center; font-size: .875rem; font-weight: 700; color: #991b1b; background: #fef2f2; border: 2px solid #fee2e2; border-radius: 1rem; }"
+    },
+    {
+      "name": "Success Notice",
+      "kind": "custom",
+      "refersTo": "notice-success",
+      "description": "Brief announced success toast.",
+      "html": "<p role=\"status\" class=\"ds-notice-success\">Mia checked in!</p>",
+      "css": ".ds-notice-success { font-family: Nunito, ui-rounded, system-ui, sans-serif; margin: 0; padding: 12px; text-align: center; font-size: 1rem; font-weight: 900; color: #fff; background: #15803d; border-radius: 1rem; }"
+    },
+    {
+      "name": "Help Button",
+      "kind": "custom",
+      "refersTo": "help-button",
+      "description": "Floating ? that opens the step-by-step help on every page.",
+      "html": "<button class=\"ds-help\" aria-label=\"Open help\">?</button>",
+      "css": ".ds-help { font-family: Nunito, ui-rounded, system-ui, sans-serif; width: 56px; height: 56px; border: none; border-radius: 9999px; background: #1a6bd6; color: #fff; font-size: 1.5rem; font-weight: 900; box-shadow: 0 10px 15px -3px #93c5fd; cursor: pointer; transition: background .15s, transform .15s; } .ds-help:hover { background: #1558b3; } .ds-help:active { transform: scale(.95); } .ds-help:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Admin Nav",
+      "kind": "nav",
+      "refersTo": "button-secondary",
+      "description": "Equal-width section pills at the top of admin pages.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Admin sections\"><a href=\"#\">Members</a><a href=\"#\">Age Groups</a><a href=\"#\">Past Sessions</a></nav>",
+      "css": ".ds-nav { font-family: Nunito, ui-rounded, system-ui, sans-serif; display: flex; gap: 8px; } .ds-nav a { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 12px; background: #fff; color: #1a6bd6; font-size: .875rem; font-weight: 900; text-decoration: none; border: 2px solid #dbeafe; border-radius: 1rem; transition: background .15s; } .ds-nav a:hover { background: #eff6ff; } .ds-nav a:focus-visible { outline: 3px solid #1a6bd6; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sunday Playroom",
+    "overview": "Check-in should feel like walking into the kids' room on a Sunday morning: bright, soft, a little bouncy, and obviously made for children. Parents tapping on a phone in a busy lobby should feel welcomed and never lost. Leaders at the admin screens should feel the same room, just with the lights on for work. The playfulness is in the materials (rounded type, pillowy cards, sunshine and bubblegum circles, emoji) and never in the controls. Every button, field, and message is plain, large, and obvious.\n\nThe system is light-only on purpose. It is used under bright lobby light on mid-range phones, and a dark theme would add maintenance for no one. Density is low on parent screens (one decision per screen, big tap tiles) and moderate on admin screens (lists, counts, filters). Both share the same card, field, and button vocabulary.",
+    "keyCharacteristics": [
+      "One brand blue carries every primary action. Everything else is soft tint or neutral ink.",
+      "One rounded family (Nunito) at three weights. The 900 weight does all the shouting.",
+      "Pillowy white cards on a sky-to-sunshine gradient canvas.",
+      "Emoji and soft decorative circles appear on every page, including admin, as the brand's voice.",
+      "Accessibility floor is non-negotiable: AA contrast, 44px taps, announced messages."
+    ],
+    "rules": [
+      {
+        "name": "The Blue Means Go Rule",
+        "body": "Sunday Blue is reserved for the thing to tap next. Decoration uses the pastel atmosphere colors, never the brand blue at full strength.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Grey On The Sky Rule",
+        "body": "Text sitting directly on the gradient canvas is Quiet Ink (#475569) or darker. Whisper Ink lives only inside white cards.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour Plus Words Rule",
+        "body": "State is never colour alone: errors say what is wrong, birthdays say \"Birthday today!\", checked-out rows say \"Out\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Weights Rule",
+        "body": "Only 400, 700, and 900 exist. Hierarchy comes from the jump to 900, not from new weights or new families.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Tiny Shouting Rule",
+        "body": "No uppercase letter-spaced micro-labels. The one exception is the \"Kids Church\" brand line on the home page.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tinted Shadow Rule",
+        "body": "Shadows are tinted with Cloud blue. A neutral grey drop shadow looks like a different product.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** use `bg-brand` / `hover:bg-brand-strong` for every primary action. Never type the hex.",
+      "**Do** build surfaces from the `card` utility, fields from `inputClass`/`labelClass`, messages from `Notice`, and pop-ups from `Modal`.",
+      "**Do** route every client request through `requestJson` in `app/lib/api.ts`, so failures become readable messages instead of stuck buttons.",
+      "**Do** keep every tap target at least 44px (`min-h-11`) and every form field at 16px text.",
+      "**Do** keep emoji and decorative circles on every page: hero-card circles on parent pages, `<Decor />` on admin pages. Always mark them `aria-hidden=\"true\"`.",
+      "**Do** say what happened and what to do next in errors (\"Could not reach the server. Check your connection and try again.\").",
+      "**Do** respect `prefers-reduced-motion` on any scale or transform (`motion-reduce:`)."
+    ],
+    "donts": [
+      "**Don't** put Whisper Ink (#64748b) or anything lighter directly on the gradient canvas.",
+      "**Don't** add a dark theme, a second font family, or weights other than 400/700/900.",
+      "**Don't** use uppercase letter-spaced micro-labels (except the home \"Kids Church\" line).",
+      "**Don't** nest a card inside a card. Use a divider or a tinted panel instead.",
+      "**Don't** use `alert()` for errors; use `Notice`. `confirm()` is acceptable only for irreversible bulk or delete actions, and must name the count or item.",
+      "**Don't** use grey drop shadows or zero-offset glows. Shadows are Cloud-tinted and offset downward.",
+      "**Don't** spend Sunday Blue on decoration."
+    ]
+  }
+}
