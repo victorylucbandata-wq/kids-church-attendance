@@ -202,6 +202,7 @@ The source of truth for "where are we". Each entry records what changed since th
 | Date | Change since last entry |
 |---|---|
 | 2026-09-27 | Plan created. Decisions from the 2026-09-27 planning session recorded in the PRD, section 10. Nothing built. Production already has: Singapore function region, signed admin cookie, CSV export (PR #3). |
+| 2026-09-27 | **Stage 1 gate met; step 1.1 applied to production.** Gate: n8n API reachable over HTTPS (Hostinger VPS); database access via Session pooler `aws-1-ap-southeast-1` (confirms Singapore); backup of the whole `public` schema taken and row counts verified (`~/kids-church-attendance/backups/`, local only). Migration `supabase/migrations/20260927000001_multi_church_foundation.sql` dry-run in a rolled-back transaction, then applied: Victory Lucban created; 180 members, 298 attendance, 18 sessions, 39 first timers, 3 age groups backfilled; 3 service times created and all 298 check-ins linked. Deployed code smoke-tested against it with no errors. Transition defaults and trigger remain until cutover. |
 
 ## 8. Open items needing follow-up
 
@@ -212,5 +213,6 @@ The source of truth for "where are we". Each entry records what changed since th
 | 3 | Data-sharing agreement or parent privacy notice under RA 10173 | Network leadership (stage 2 gate) |
 | 4 | Pilot church | Network leadership (stage 2 gate) |
 | 5 | Domain | Network admin (stage 3 gate) |
-| 6 | `first_timers` shows 0 rows to the app. Confirm whether it is genuinely empty or hidden by an existing policy before migrating it. | Network admin, before step 1.1 |
-| 7 | Confirm the exact current RLS state and policies in the Supabase dashboard (the MCP account used on 2026-09-27 lacked access), so the migration starts from known policies rather than assumed ones | Network admin, before step 1.2 |
+| 6 | ~~`first_timers` shows 0 rows to the app.~~ **Resolved 2026-09-27:** 39 rows exist; the publishable key may insert but not read them, so dashboard, Past Sessions and export showed 0. Fixed by step 1.2 (admin reads as the signed-in user). | Done |
+| 7 | ~~Confirm current RLS state.~~ **Resolved 2026-09-27:** RLS is on for every table, but the `anon` role has SELECT/INSERT/UPDATE (and DELETE on `members`, `age_groups`) with `true` conditions; `authenticated` has ALL. Step 1.2 replaces these for the kids tables. | Done |
+| 8 | The database also holds a separate, live app's tables (`sfc_*`: 46 participants, 230 attendance, last used 2026-09-22) with the same open anon policies. Step 1.2 must not touch them, and isolation test 1 applies to the kids tables only. Consider moving that app to its own project, and tightening its policies, as separate work. | Network admin |
