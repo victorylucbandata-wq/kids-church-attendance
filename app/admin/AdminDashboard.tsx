@@ -1,10 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AdminData } from '@/app/lib/types'
 import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import { requestJson } from '@/app/lib/api'
+import { inputClass } from '@/app/lib/ui'
+import Decor from '@/app/components/Decor'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -39,7 +43,13 @@ const HELP_STEPS: HelpStep[] = [
   },
 ]
 
-const TIME_SLOTS = ['9am', '11am', 'Special']
+const TIME_SLOTS = [
+  { value: '9am', label: '9:00 AM' },
+  { value: '11am', label: '11:00 AM' },
+  { value: 'Special', label: 'Special Event' },
+]
+
+const slotLabel = (value: string | null) => TIME_SLOTS.find((t) => t.value === value)?.label ?? value ?? '—'
 
 type Props = {
   initialData: (AdminData & { success: boolean }) | null
@@ -49,7 +59,7 @@ type Props = {
 export default function AdminDashboard({ initialData, initialError }: Props) {
   const router = useRouter()
   const [data, setData] = useState(initialData)
-  const [error, setError] = useState(initialError)
+  const [error] = useState(initialError)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateMsg, setGenerateMsg] = useState('')
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -59,6 +69,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
   const [manualSubmitting, setManualSubmitting] = useState(false)
   const [checkingOutId, setCheckingOutId] = useState<string | null>(null)
   const [bulkCheckingOut, setBulkCheckingOut] = useState(false)
+  const [actionError, setActionError] = useState('')
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'here' | 'out'>('all')
 
   const sessionExists = !!data?.session
@@ -73,8 +84,16 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
   useEffect(() => {
     if (!sessionExists) return
-    const interval = setInterval(refreshData, 20000)
-    return () => clearInterval(interval)
+    // Skip refreshes while the tab is hidden (e.g. a phone in a pocket), catch up on return.
+    const tick = () => {
+      if (document.visibilityState === 'visible') refreshData()
+    }
+    const interval = setInterval(tick, 20000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', tick)
+    }
   }, [sessionExists, refreshData])
 
   const handleGenerate = async () => {
@@ -110,61 +129,45 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
     }
   }
 
+  // Sends an attendance change; returns true on success, otherwise shows the error inline.
+  const sendAttendance = async (method: 'POST' | 'PATCH', body: object) => {
+    setActionError('')
+    const res = await requestJson('/api/admin/attendance', { method, body })
+    if (!res.ok) {
+      setActionError(res.error)
+      return false
+    }
+    await refreshData()
+    return true
+  }
+
   const handleManualCheckIn = async () => {
     if (!manualMemberId || !data?.session) return
     setManualSubmitting(true)
-    const res = await fetch('/api/admin/attendance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        memberId: manualMemberId,
-        sessionId: data.session.id,
-        timeSlot: manualTimeSlot,
-      }),
+    const ok = await sendAttendance('POST', {
+      memberId: manualMemberId,
+      sessionId: data.session.id,
+      timeSlot: manualTimeSlot,
     })
-    const result = await res.json()
     setManualSubmitting(false)
-    if (result.success) {
+    if (ok) {
       setManualMemberId('')
       setShowManualCheckIn(false)
-      await refreshData()
-    } else {
-      alert(result.error)
     }
   }
 
   const handleCheckout = async (attendanceId: string) => {
     setCheckingOutId(attendanceId)
-    const res = await fetch('/api/admin/attendance', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ attendanceId, checkedOut: true }),
-    })
-    const result = await res.json()
+    await sendAttendance('PATCH', { attendanceId, checkedOut: true })
     setCheckingOutId(null)
-    if (result.success) {
-      await refreshData()
-    } else {
-      alert(result.error)
-    }
   }
 
   const handleBulkCheckout = async () => {
     if (!data?.session) return
-    if (!confirm('Check out all remaining kids? This cannot be undone.')) return
+    if (!confirm(`Check out all ${data.summary.stillHere} kids still here? This can't be undone.`)) return
     setBulkCheckingOut(true)
-    const res = await fetch('/api/admin/attendance', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bulkCheckoutAll: true, sessionId: data.session.id }),
-    })
-    const result = await res.json()
+    await sendAttendance('PATCH', { bulkCheckoutAll: true, sessionId: data.session.id })
     setBulkCheckingOut(false)
-    if (result.success) {
-      await refreshData()
-    } else {
-      alert(result.error)
-    }
   }
 
   const formatTime = (ts: string | null) => {
@@ -176,41 +179,49 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
   const uncheckedMembers = data?.attendanceRows.filter(r => !r.checkedIn) ?? []
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
+      <Decor />
+      <div className="relative mx-auto max-w-2xl space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#227EEE]">Admin</p>
-            <h1 className="text-2xl font-black text-slate-900">Attendance Dashboard</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📋</span>Attendance Dashboard</h1>
+            <p className="text-sm text-slate-600">
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-500 transition hover:border-slate-300 disabled:opacity-60"
+            className="min-h-11 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60"
           >
             {isLoggingOut ? 'Logging out…' : 'Logout'}
           </button>
         </div>
 
         {/* Quick nav */}
-        <div className="flex gap-2">
-          <a href="/admin/members" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+        <nav aria-label="Admin sections" className="flex gap-2">
+          <Link href="/admin/members" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Members
-          </a>
-          <a href="/admin/age-groups" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          </Link>
+          <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Age Groups
-          </a>
-          <a href="/admin/sessions" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          </Link>
+          <Link href="/admin/sessions" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Past Sessions
-          </a>
-        </div>
+          </Link>
+        </nav>
 
         {/* Error state */}
+        {actionError && (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl border-2 border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+            <span>{actionError}</span>
+            <button type="button" onClick={() => setActionError('')} aria-label="Dismiss error" className="-m-2 min-h-11 min-w-11 text-red-800">
+              ✕
+            </button>
+          </div>
+        )}
         {error && (
           <div className="rounded-2xl border-2 border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
             {error}
@@ -218,7 +229,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
         )}
 
         {/* Generate session card */}
-        <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-lg shadow-blue-100/50">
+        <div className="card p-6">
           <h2 className="mb-4 text-lg font-black text-slate-800">Today&apos;s Session</h2>
 
           {sessionExists ? (
@@ -234,12 +245,12 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
               <button
                 onClick={handleGenerate}
                 disabled={isGenerating}
-                className="w-full rounded-2xl bg-[#227EEE] px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
+                className="w-full rounded-2xl bg-brand px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
               >
                 {isGenerating ? 'Generating…' : 'Generate Session'}
               </button>
               {generateMsg && (
-                <p className="rounded-2xl bg-blue-50 px-4 py-2 text-sm font-bold text-slate-700">
+                <p role="status" className="rounded-2xl bg-blue-50 px-4 py-2 text-sm font-bold text-slate-700">
                   {generateMsg}
                 </p>
               )}
@@ -276,13 +287,13 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
             <div className="grid grid-cols-2 gap-3">
               {/* By Time Slot */}
               <div className="rounded-2xl border-2 border-blue-50 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">By Time Slot</p>
+                <p className="mb-2 text-sm font-bold text-slate-700">By Time Slot</p>
                 {Object.entries(data.summary.byTimeSlot).length === 0 ? (
-                  <p className="text-sm text-slate-300">—</p>
+                  <p className="text-sm text-slate-500">—</p>
                 ) : (
                   Object.entries(data.summary.byTimeSlot).map(([slot, count]) => (
                     <div key={slot} className="flex justify-between text-sm">
-                      <span className="text-slate-600">{slot}</span>
+                      <span className="text-slate-600">{slotLabel(slot)}</span>
                       <span className="font-black text-slate-800">{count}</span>
                     </div>
                   ))
@@ -291,9 +302,9 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
               {/* By Age Group */}
               <div className="rounded-2xl border-2 border-blue-50 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">By Age Group</p>
+                <p className="mb-2 text-sm font-bold text-slate-700">By Age Group</p>
                 {Object.entries(data.summary.byAgeGroup).length === 0 ? (
-                  <p className="text-sm text-slate-300">—</p>
+                  <p className="text-sm text-slate-500">—</p>
                 ) : (
                   Object.entries(data.summary.byAgeGroup).map(([group, count]) => (
                     <div key={group} className="flex justify-between text-sm">
@@ -312,7 +323,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
               if (birthdayToday.length === 0 && birthdayWeek.length === 0) return null
               return (
                 <div className="rounded-2xl border-2 border-yellow-200 bg-yellow-50 p-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-yellow-600">🎂 Birthdays</p>
+                  <p className="text-sm font-bold text-yellow-800"><span aria-hidden="true">🎂 </span>Birthdays</p>
                   {birthdayToday.map(r => (
                     <p key={r.attendanceId} className="text-sm font-black text-yellow-800">
                       {r.memberName} — Birthday today!
@@ -329,8 +340,8 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
             {/* First timers count */}
             {data.summary.firstTimersToday > 0 && (
-              <div className="rounded-2xl border-2 border-purple-100 bg-purple-50 p-4 text-center">
-                <p className="text-2xl font-black text-purple-700">{data.summary.firstTimersToday}</p>
+              <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-4 text-center">
+                <p className="text-2xl font-black text-brand">{data.summary.firstTimersToday}</p>
                 <p className="text-xs font-bold text-slate-600 mt-1">First Timer{data.summary.firstTimersToday !== 1 ? 's' : ''} Today</p>
               </div>
             )}
@@ -339,22 +350,25 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
         {/* Manual check-in */}
         {data?.session && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-lg shadow-blue-100/50">
+          <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-black text-slate-800">Manual Check-In</h2>
               <button
                 onClick={() => setShowManualCheckIn(!showManualCheckIn)}
-                className="rounded-xl border-2 border-blue-100 px-3 py-1.5 text-xs font-black text-[#227EEE] hover:bg-blue-50"
+                aria-expanded={showManualCheckIn}
+                className="min-h-11 rounded-xl border-2 border-blue-100 px-4 py-2 text-sm font-black text-brand hover:bg-blue-50"
               >
                 {showManualCheckIn ? 'Close' : 'Open'}
               </button>
             </div>
             {showManualCheckIn && (
               <div className="space-y-3">
+                <label htmlFor="manual-member" className="block text-sm font-bold text-slate-700">Member</label>
                 <select
+                  id="manual-member"
                   value={manualMemberId}
                   onChange={e => setManualMemberId(e.target.value)}
-                  className="w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#227EEE]"
+                  className={inputClass}
                 >
                   <option value="">Select member…</option>
                   {uncheckedMembers.map(m => (
@@ -363,19 +377,21 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                     </option>
                   ))}
                 </select>
+                <label htmlFor="manual-slot" className="block text-sm font-bold text-slate-700">Time slot</label>
                 <select
+                  id="manual-slot"
                   value={manualTimeSlot}
                   onChange={e => setManualTimeSlot(e.target.value)}
-                  className="w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-[#227EEE]"
+                  className={inputClass}
                 >
                   {TIME_SLOTS.map(ts => (
-                    <option key={ts} value={ts}>{ts}</option>
+                    <option key={ts.value} value={ts.value}>{ts.label}</option>
                   ))}
                 </select>
                 <button
                   onClick={handleManualCheckIn}
                   disabled={!manualMemberId || manualSubmitting}
-                  className="w-full rounded-2xl bg-[#227EEE] px-4 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
+                  className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
                 >
                   {manualSubmitting ? 'Checking in…' : 'Check In'}
                 </button>
@@ -394,14 +410,14 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
             : checkedInRows
 
           return (
-            <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-lg shadow-blue-100/50">
+            <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-black text-slate-800">Attendance</h2>
                 {data.summary.stillHere > 0 && (
                   <button
                     onClick={handleBulkCheckout}
                     disabled={bulkCheckingOut}
-                    className="rounded-xl border-2 border-red-200 px-3 py-1.5 text-xs font-black text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    className="min-h-11 rounded-xl border-2 border-red-200 px-4 py-2 text-sm font-black text-red-700 hover:bg-red-50 disabled:opacity-60"
                   >
                     {bulkCheckingOut ? 'Checking out…' : 'Check Out All'}
                   </button>
@@ -409,7 +425,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
               </div>
 
               {/* Filter tabs */}
-              <div className="flex gap-1 mb-4 rounded-2xl bg-slate-100 p-1">
+              <div role="group" aria-label="Filter attendance" className="flex gap-1 mb-4 rounded-2xl bg-slate-100 p-1">
                 {([
                   { key: 'all' as const, label: `All (${checkedInRows.length})` },
                   { key: 'here' as const, label: `Still Here (${data.summary.stillHere})` },
@@ -418,10 +434,11 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                   <button
                     key={tab.key}
                     onClick={() => setAttendanceFilter(tab.key)}
-                    className={`flex-1 rounded-xl px-3 py-2 text-xs font-black transition ${
+                    aria-pressed={attendanceFilter === tab.key}
+                    className={`min-h-11 flex-1 rounded-xl px-2 py-2 text-xs font-black transition ${
                       attendanceFilter === tab.key
                         ? 'bg-white text-slate-800 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     {tab.label}
@@ -431,7 +448,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
               <div className="space-y-2">
                 {filtered.length === 0 && (
-                  <p className="text-center text-sm text-slate-400 py-4">No members in this view.</p>
+                  <p className="text-center text-sm text-slate-500 py-4">No members in this view.</p>
                 )}
                 {filtered.map(row => {
                   const bdayToday = isBirthdayToday(row.birthday)
@@ -450,31 +467,31 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className={`font-black text-sm truncate ${row.checkedOutAt ? 'text-slate-400' : 'text-slate-800'}`}>
-                        {(bdayToday || bdayWeek) && <span className="mr-1">🎂</span>}
+                      <p className={`font-black text-sm truncate ${row.checkedOutAt ? 'text-slate-500' : 'text-slate-800'}`}>
+                        {(bdayToday || bdayWeek) && <span aria-hidden="true" className="mr-1">🎂</span>}
                         {row.memberName}
                         {row.role === 'volunteer' && (
-                          <span className="ml-1 text-xs text-purple-500 font-bold">V</span>
+                          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-brand">Serve</span>
                         )}
                       </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
                         {row.ageGroup && <span>{row.ageGroup} · </span>}
-                        <span className="font-bold">{row.timeSlot}</span>
+                        <span className="font-bold">{slotLabel(row.timeSlot)}</span>
                         {' · In '}{formatTime(row.checkedInAt)}
                         {row.checkedOutAt && <span> · Out {formatTime(row.checkedOutAt)}</span>}
                       </p>
                     </div>
                     {row.checkedOutAt ? (
-                      <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-500">
+                      <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
                         Out
                       </span>
                     ) : (
                       <button
                         onClick={() => handleCheckout(row.attendanceId)}
                         disabled={checkingOutId === row.attendanceId}
-                        className="shrink-0 rounded-xl bg-orange-50 border-2 border-orange-200 px-3 py-1.5 text-xs font-black text-orange-700 hover:bg-orange-100 disabled:opacity-60 transition"
+                        className="min-h-11 shrink-0 rounded-xl bg-orange-50 border-2 border-orange-200 px-3 py-2 text-sm font-black text-orange-800 hover:bg-orange-100 disabled:opacity-60 transition"
                       >
-                        {checkingOutId === row.attendanceId ? '…' : 'Check Out'}
+                        {checkingOutId === row.attendanceId ? 'Saving…' : 'Check Out'}
                       </button>
                     )}
                   </div>
@@ -487,10 +504,10 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
         {/* First timers */}
         {data?.firstTimers && data.firstTimers.length > 0 && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-6 shadow-lg shadow-blue-100/50">
+          <div className="card p-6">
             <h2 className="mb-4 text-lg font-black text-slate-800">
               First Timers
-              <span className="ml-2 rounded-full bg-[#227EEE] px-2.5 py-0.5 text-sm text-white">
+              <span className="ml-2 rounded-full bg-brand px-2.5 py-0.5 text-sm text-white">
                 {data.firstTimers.length}
               </span>
             </h2>
@@ -509,7 +526,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                   {ft.notes && (
                     <p className="text-sm text-slate-500 mt-1">Notes: {ft.notes}</p>
                   )}
-                  <p className="text-xs text-slate-400 mt-1">{formatTime(ft.submittedAt)}</p>
+                  <p className="text-xs text-slate-500 mt-1">{formatTime(ft.submittedAt)}</p>
                 </div>
               ))}
             </div>
@@ -518,15 +535,15 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
 
         {/* No session, no data */}
         {!data?.session && !error && (
-          <p className="text-center text-sm text-slate-400 py-4">
+          <p className="text-center text-sm text-slate-500 py-4">
             Generate a session above to start tracking attendance.
           </p>
         )}
 
         <div className="text-center">
-          <a href="/" className="text-sm font-bold text-slate-400 hover:text-slate-600">
+          <Link href="/" className="inline-block px-4 py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
             ← Back to Check-In
-          </a>
+          </Link>
         </div>
       </div>
 

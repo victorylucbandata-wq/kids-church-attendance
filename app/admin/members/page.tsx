@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import { inputClass } from '@/app/lib/ui'
+import { requestJson } from '@/app/lib/api'
+import Notice from '@/app/components/Notice'
+import Link from 'next/link'
+import Decor from '@/app/components/Decor'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -53,94 +58,115 @@ export default function MembersPage() {
   const [filterActive, setFilterActive] = useState('true')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
+  const [error, setError] = useState('')
 
   const PAGE_SIZE = 20
 
   useEffect(() => {
-    fetch('/api/admin/age-groups').then(r => r.json()).then(d => {
-      if (d.success) setAgeGroups(d.ageGroups)
+    requestJson<{ ageGroups: AgeGroup[] }>('/api/admin/age-groups').then((res) => {
+      if (res.ok) setAgeGroups(res.data.ageGroups)
     })
   }, [])
 
   useEffect(() => {
-    setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (filterRole) params.set('role', filterRole)
     if (filterAgeGroup) params.set('ageGroup', filterAgeGroup)
     params.set('active', filterActive)
 
-    fetch(`/api/admin/members?${params}`).then(r => r.json()).then(d => {
-      if (d.success) setMembers(d.members)
-      setLoading(false)
-    })
+    // Wait for a pause in typing, and drop replies for searches that are no longer current.
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await requestJson<{ members: Member[] }>(`/api/admin/members?${params}`, {
+          signal: controller.signal,
+        })
+        if (res.ok) {
+          setMembers(res.data.members)
+          setError('')
+        } else {
+          setError(`Couldn't load members. ${res.error}`)
+        }
+        setLoading(false)
+      } catch {
+        // Aborted: a newer search is already on its way.
+      }
+    }, search ? 250 : 0)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [search, filterRole, filterAgeGroup, filterActive])
 
   const totalPages = Math.ceil(members.length / PAGE_SIZE)
   const paged = members.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const handleToggleActive = async (member: Member) => {
-    const res = await fetch(`/api/admin/members/${member.id}`, {
+    setError('')
+    const res = await requestJson(`/api/admin/members/${member.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !member.is_active }),
+      body: { is_active: !member.is_active },
     })
-    const data = await res.json()
-    if (data.success) {
+    if (res.ok) {
       setMembers(prev => prev.map(m => m.id === member.id ? { ...m, is_active: !m.is_active } : m))
+    } else {
+      setError(res.error)
     }
   }
 
-  const inputClass = 'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6">
-      <div className="mx-auto max-w-2xl space-y-4">
+    <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
+      <Decor />
+      <div className="relative mx-auto max-w-2xl space-y-4">
 
         <div className="flex gap-2">
-          <a href="/admin" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          <Link href="/admin" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             ← Dashboard
-          </a>
-          <a href="/admin/age-groups" className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-[#227EEE] transition hover:bg-blue-50">
+          </Link>
+          <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Age Groups
-          </a>
+          </Link>
         </div>
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-900">Members</h1>
-            <p className="text-sm text-slate-500">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">👥</span>Members</h1>
+            <p className="text-sm text-slate-600">{members.length} member{members.length !== 1 ? 's' : ''}</p>
           </div>
           <button
             onClick={() => router.push('/admin/members/new')}
-            className="rounded-2xl bg-[#227EEE] px-5 py-2.5 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:brightness-95"
+            className="min-h-11 rounded-2xl bg-brand px-5 py-2.5 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong"
           >
             + Add Member
           </button>
         </div>
 
         {/* Filters */}
-        <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-lg shadow-blue-100/50 space-y-3">
+        <div className="card p-4 space-y-3">
           <input
-            type="text"
+            type="search"
+            aria-label="Search members by name"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             placeholder="Search by name…"
             className={inputClass}
           />
-          <div className="grid grid-cols-3 gap-2">
-            <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(0) }} className={inputClass}>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <select aria-label="Filter by role" value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(0) }} className={inputClass}>
               <option value="">All roles</option>
               <option value="child">Child</option>
               <option value="volunteer">Volunteer</option>
             </select>
-            <select value={filterAgeGroup} onChange={e => { setFilterAgeGroup(e.target.value); setPage(0) }} className={inputClass}>
+            <select aria-label="Filter by age group" value={filterAgeGroup} onChange={e => { setFilterAgeGroup(e.target.value); setPage(0) }} className={inputClass}>
               <option value="">All groups</option>
               {ageGroups.map(ag => (
                 <option key={ag.id} value={ag.id}>{ag.name}</option>
               ))}
             </select>
-            <select value={filterActive} onChange={e => { setFilterActive(e.target.value); setPage(0) }} className={inputClass}>
+            <select aria-label="Filter by status" value={filterActive} onChange={e => { setFilterActive(e.target.value); setPage(0) }} className={inputClass}>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
               <option value="all">All</option>
@@ -148,16 +174,18 @@ export default function MembersPage() {
           </div>
         </div>
 
+        {error && <Notice kind="error">{error}</Notice>}
+
         {/* Loading */}
         {loading && (
-          <p className="text-center text-sm text-slate-400 py-4">Loading…</p>
+          <p role="status" className="text-center text-sm text-slate-600 py-4">Loading members…</p>
         )}
 
         {/* Member list */}
         {!loading && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-lg shadow-blue-100/50 space-y-2">
+          <div className="card p-4 space-y-2">
             {paged.length === 0 && (
-              <p className="text-center text-sm text-slate-400 py-6">No members found.</p>
+              <p className="text-center text-sm text-slate-500 py-6">No members found.</p>
             )}
             {paged.map((m) => (
               <div
@@ -171,21 +199,22 @@ export default function MembersPage() {
                   <p className="font-black text-slate-800 text-sm">
                     {m.nickname || m.first_name}
                     {!m.is_active && (
-                      <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-500">Inactive</span>
+                      <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">Inactive</span>
                     )}
                   </p>
                   <p className="text-xs text-slate-500">{m.last_name}, {m.first_name}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {m.age_group_name || '—'}
                     {m.role === 'volunteer' && ' · Volunteer'}
                   </p>
                 </button>
                 <button
                   onClick={() => handleToggleActive(m)}
-                  className={`ml-3 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                  aria-label={`${m.is_active ? 'Deactivate' : 'Activate'} ${m.first_name} ${m.last_name}`}
+                  className={`ml-3 min-h-11 shrink-0 rounded-xl px-3 py-2 text-sm font-bold transition ${
                     m.is_active
-                      ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                      : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                      : 'bg-green-50 text-green-800 hover:bg-green-100'
                   }`}
                 >
                   {m.is_active ? 'Deactivate' : 'Activate'}
@@ -199,17 +228,17 @@ export default function MembersPage() {
                 <button
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-blue-50 disabled:opacity-30"
+                  className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-blue-50 disabled:opacity-30"
                 >
                   ← Prev
                 </button>
-                <span className="text-xs font-bold text-slate-400">
+                <span className="text-xs font-bold text-slate-500">
                   {page + 1} / {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="flex-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-blue-50 disabled:opacity-30"
+                  className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-slate-600 transition hover:bg-blue-50 disabled:opacity-30"
                 >
                   Next →
                 </button>

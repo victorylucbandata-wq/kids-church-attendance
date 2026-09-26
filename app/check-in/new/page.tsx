@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import { inputClass, labelClass } from '@/app/lib/ui'
+import { requestJson } from '@/app/lib/api'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -45,6 +48,21 @@ type FirstTimerForm = {
   notes: string
 }
 
+type AgeGroup = { id: string; name: string }
+
+const fetchAgeGroups = () => requestJson<{ ageGroups: AgeGroup[] }>('/api/age-groups')
+
+type FieldErrors = Partial<Record<keyof FirstTimerForm, string>>
+
+const REQUIRED_FIELDS: [keyof FirstTimerForm, string][] = [
+  ['parentName', 'Parent / guardian name'],
+  ['contactNumber', 'Contact number'],
+  ['childFirstName', "Child's first name"],
+  ['childLastName', "Child's last name"],
+  ['ageGroup', 'Age group'],
+  ['timeSlot', 'Time slot'],
+]
+
 const initialForm: FirstTimerForm = {
   parentName: '',
   contactNumber: '',
@@ -60,21 +78,28 @@ const initialForm: FirstTimerForm = {
 
 export default function FirstTimerPage() {
   const [form, setForm] = useState<FirstTimerForm>(initialForm)
-  const [ageGroups, setAgeGroups] = useState<{ id: string; name: string }[]>([])
+  const [ageGroups, setAgeGroups] = useState<AgeGroup[]>([])
+  const [ageGroupsFailed, setAgeGroupsFailed] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)
   const [message, setMessage] = useState('')
+  const [errors, setErrors] = useState<FieldErrors>({})
   const [countdown, setCountdown] = useState(4)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // A failed load would leave the required Age Group empty, so offer a retry instead.
+  const loadAgeGroups = () =>
+    fetchAgeGroups().then((res) => {
+      if (res.ok) setAgeGroups(res.data.ageGroups)
+      setAgeGroupsFailed(!res.ok)
+    })
+
   useEffect(() => {
-    fetch('/api/age-groups')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.ageGroups) setAgeGroups(data.ageGroups)
-      })
-      .catch(() => {})
+    fetchAgeGroups().then((res) => {
+      if (res.ok) setAgeGroups(res.data.ageGroups)
+      setAgeGroupsFailed(!res.ok)
+    })
   }, [])
 
   useEffect(() => {
@@ -86,8 +111,6 @@ export default function FirstTimerPage() {
 
   useEffect(() => {
     if (!justSubmitted) return
-
-    setCountdown(4)
 
     countdownRef.current = setInterval(() => {
       setCountdown((c) => c - 1)
@@ -108,20 +131,18 @@ export default function FirstTimerPage() {
 
   const updateField = (field: keyof FirstTimerForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setMessage('')
 
-    if (
-      !form.parentName ||
-      !form.contactNumber ||
-      !form.childFirstName ||
-      !form.childLastName ||
-      !form.ageGroup ||
-      !form.timeSlot
-    ) {
-      setMessage('Please complete the required fields before checking in.')
+    const missing = REQUIRED_FIELDS.filter(([key]) => !form[key].trim())
+    if (missing.length > 0) {
+      setErrors(Object.fromEntries(missing.map(([key, label]) => [key, `${label} is required.`])))
+      setMessage(`Please fill in: ${missing.map(([, label]) => label).join(', ')}.`)
+      document.getElementById(missing[0][0])?.focus()
       return
     }
 
@@ -137,217 +158,217 @@ export default function FirstTimerPage() {
       const result = await res.json()
 
       if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Something went wrong.')
+        throw new Error(result.error || 'Check-in did not go through. Please try again or ask a volunteer.')
       }
 
+      setCountdown(4)
       setJustSubmitted(true)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to submit. Please try again.')
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Could not reach the server. Check your connection and tap Check In again.'
+      )
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // Wires a field to form state, its error message, and screen readers.
+  const field = (key: keyof FirstTimerForm) => ({
+    id: key,
+    name: key,
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      updateField(key, e.target.value),
+    className: inputClass,
+    'aria-invalid': errors[key] ? true : undefined,
+    'aria-describedby': errors[key] ? `${key}-error` : undefined,
+  })
+
+  const fieldError = (key: keyof FirstTimerForm) =>
+    errors[key] && (
+      <span id={`${key}-error`} className="mt-1.5 block text-sm font-bold text-red-700">
+        {errors[key]}
+      </span>
+    )
+
+  const required = <span aria-hidden="true" className="text-red-700"> *</span>
+
   const displayName = form.childNickname
     ? `${form.childNickname} (${form.childLastName}, ${form.childFirstName})`
     : `${form.childFirstName} ${form.childLastName}`
 
-  const inputClass =
-    'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
-
-  const labelClass = 'mb-1.5 block text-sm font-bold text-slate-700'
+  const details: [string, string][] = [
+    ['Parent', form.parentName],
+    ['Contact', form.contactNumber],
+    ['Child', displayName],
+    ['Birthday', form.birthday],
+    ['Age', form.age],
+    ['Group', form.ageGroup],
+    ['Time slot', TIME_SLOTS.find((t) => t.value === form.timeSlot)?.label ?? form.timeSlot],
+    ['Notes', form.notes],
+  ]
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6 text-slate-900">
-      <section className="relative mx-auto max-w-md overflow-hidden rounded-[2rem] border border-blue-100 bg-white p-6 shadow-xl shadow-blue-100/70">
-        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-yellow-200/70" />
-        <div className="absolute -right-10 top-20 h-28 w-28 rounded-full bg-blue-200/60" />
-        <div className="absolute bottom-10 -left-10 h-24 w-24 rounded-full bg-pink-200/60" />
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24 text-slate-900">
+      <section className="relative mx-auto max-w-md overflow-hidden card p-6">
+        <div aria-hidden="true" className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-yellow-200/70" />
+        <div aria-hidden="true" className="absolute -right-10 top-20 h-28 w-28 rounded-full bg-blue-200/60" />
 
         <div className="relative mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#227EEE] text-3xl shadow-lg shadow-blue-200">
+          <div aria-hidden="true" className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-brand text-3xl shadow-lg shadow-blue-200">
             🧒
           </div>
-          <p className="text-sm font-bold uppercase tracking-wide text-[#227EEE]">Kids Church</p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">First Timer!</h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            Welcome! Please fill in your details to check in.
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">First Timer!</h1>
+          <p className="mt-2 text-base leading-relaxed text-slate-600">
+            Welcome! Fill in a few details and your child is registered and checked in.
           </p>
-          <div className="mt-4 flex justify-center gap-2 text-2xl">
-            <span>🌈</span>
-            <span>⭐</span>
-            <span>🎨</span>
-            <span>📖</span>
-          </div>
         </div>
+
+        {/* Announces the outcome to screen readers; the visible panel below shows it. */}
+        <p role="status" className="sr-only">
+          {justSubmitted ? `Check-in successful. ${displayName} is checked in.` : ''}
+        </p>
 
         <div className="relative">
           {justSubmitted ? (
-            <div className="space-y-4 text-center">
-              <div className="rounded-[1.5rem] border-2 border-green-100 bg-green-50 p-5">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-3xl">
+            <div className="rounded-[1.5rem] border-2 border-green-100 bg-green-50 p-5">
+              <div className="text-center">
+                <div aria-hidden="true" className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-3xl">
                   ✅
                 </div>
                 <p className="text-xl font-black text-green-800">Check-in successful!</p>
-                <p className="mt-2 text-sm leading-relaxed text-green-700">
-                  Thank you! {displayName}&apos;s attendance has been recorded.
+                <p className="mt-1 text-base leading-relaxed text-green-800">
+                  {displayName} is checked in. See you next week!
                 </p>
               </div>
 
-              <div className="rounded-[1.5rem] border-2 border-blue-100 bg-blue-50/70 p-4 text-left">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-2xl">📋</span>
-                  <p className="text-sm font-black text-slate-700">Submitted Details</p>
-                </div>
-                <div className="space-y-2 rounded-2xl bg-white p-4 text-sm shadow-sm">
-                  <p><span className="font-bold text-[#227EEE]">Parent:</span> {form.parentName}</p>
-                  <p><span className="font-bold text-[#227EEE]">Contact:</span> {form.contactNumber}</p>
-                  <p><span className="font-bold text-[#227EEE]">Child:</span> {displayName}</p>
-                  {form.birthday && <p><span className="font-bold text-[#227EEE]">Birthday:</span> {form.birthday}</p>}
-                  {form.age && <p><span className="font-bold text-[#227EEE]">Age:</span> {form.age}</p>}
-                  <p><span className="font-bold text-[#227EEE]">Group:</span> {form.ageGroup}</p>
-                  <p><span className="font-bold text-[#227EEE]">Time Slot:</span> {form.timeSlot}</p>
-                  {form.notes && <p><span className="font-bold text-[#227EEE]">Notes:</span> {form.notes}</p>}
-                </div>
-              </div>
+              <dl className="mt-4 divide-y divide-green-100 border-t border-green-100 text-sm">
+                {details
+                  .filter(([, value]) => value)
+                  .map(([label, value]) => (
+                    <div key={label} className="flex gap-3 py-2">
+                      <dt className="w-20 shrink-0 font-bold text-green-800">{label}</dt>
+                      <dd className="min-w-0 break-words text-slate-800">{value}</dd>
+                    </div>
+                  ))}
+              </dl>
 
-              <p className="text-xs text-slate-400">
-                Resetting form in {countdown}s…
+              <p className="mt-3 text-center text-sm text-green-800" aria-hidden="true">
+                Clearing for the next family in {countdown}s…
               </p>
             </div>
           ) : (
-            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              <p className="text-sm text-slate-600">
+                Fields marked <span className="font-bold text-red-700">*</span> are required.
+              </p>
+
               <label className="block">
-                <span className={labelClass}>Parent / Guardian Name *</span>
-                <input
-                  value={form.parentName}
-                  onChange={(e) => updateField('parentName', e.target.value)}
-                  className={inputClass}
-                  placeholder="Enter parent or guardian name"
-                />
+                <span className={labelClass}>Parent / Guardian Name{required}</span>
+                <input {...field('parentName')} required autoComplete="name" placeholder="e.g. Maria Santos" />
+                {fieldError('parentName')}
               </label>
 
               <label className="block">
-                <span className={labelClass}>Contact Number *</span>
+                <span className={labelClass}>Contact Number{required}</span>
                 <input
-                  value={form.contactNumber}
-                  onChange={(e) => updateField('contactNumber', e.target.value)}
-                  className={inputClass}
+                  {...field('contactNumber')}
+                  required
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   placeholder="09XXXXXXXXX"
                 />
+                {fieldError('contactNumber')}
               </label>
 
               <label className="block">
-                <span className={labelClass}>Child First Name *</span>
-                <input
-                  value={form.childFirstName}
-                  onChange={(e) => updateField('childFirstName', e.target.value)}
-                  className={inputClass}
-                  placeholder="Enter first name"
-                />
+                <span className={labelClass}>Child&apos;s First Name{required}</span>
+                <input {...field('childFirstName')} required autoComplete="off" />
+                {fieldError('childFirstName')}
               </label>
 
               <label className="block">
-                <span className={labelClass}>Child Last Name *</span>
-                <input
-                  value={form.childLastName}
-                  onChange={(e) => updateField('childLastName', e.target.value)}
-                  className={inputClass}
-                  placeholder="Enter last name"
-                />
+                <span className={labelClass}>Child&apos;s Last Name{required}</span>
+                <input {...field('childLastName')} required autoComplete="off" />
+                {fieldError('childLastName')}
               </label>
 
               <label className="block">
                 <span className={labelClass}>Nickname</span>
-                <input
-                  value={form.childNickname}
-                  onChange={(e) => updateField('childNickname', e.target.value)}
-                  className={inputClass}
-                  placeholder="What does your child go by?"
-                />
+                <input {...field('childNickname')} autoComplete="off" placeholder="What does your child go by?" />
               </label>
 
-              <label className="block">
-                <span className={labelClass}>Birthday</span>
-                <input
-                  type="date"
-                  value={form.birthday}
-                  onChange={(e) => updateField('birthday', e.target.value)}
-                  className={inputClass}
-                />
-              </label>
+              <div className="grid grid-cols-[1fr_6rem] gap-3">
+                <label className="block">
+                  <span className={labelClass}>Birthday</span>
+                  <input {...field('birthday')} type="date" />
+                </label>
+
+                <label className="block">
+                  <span className={labelClass}>Age</span>
+                  <input {...field('age')} inputMode="numeric" maxLength={2} placeholder="e.g. 5" />
+                </label>
+              </div>
 
               <label className="block">
-                <span className={labelClass}>Child Age</span>
-                <input
-                  value={form.age}
-                  onChange={(e) => updateField('age', e.target.value)}
-                  className={inputClass}
-                  placeholder="e.g. 5"
-                />
-              </label>
-
-              <label className="block">
-                <span className={labelClass}>Age Group / Class *</span>
-                <select
-                  value={form.ageGroup}
-                  onChange={(e) => updateField('ageGroup', e.target.value)}
-                  className={inputClass}
-                >
+                <span className={labelClass}>Age Group / Class{required}</span>
+                <select {...field('ageGroup')} required>
                   <option value="">Select age group</option>
                   {ageGroups.map((ag) => (
                     <option key={ag.id} value={ag.name}>{ag.name}</option>
                   ))}
                 </select>
+                {fieldError('ageGroup')}
+                {ageGroupsFailed && (
+                  <span role="alert" className="mt-1.5 flex items-center justify-between gap-3 text-sm font-bold text-red-700">
+                    Couldn&apos;t load age groups.
+                    <button type="button" onClick={loadAgeGroups} className="min-h-11 shrink-0 rounded-xl border-2 border-red-200 px-3 text-sm font-black text-red-700 hover:bg-red-50">
+                      Try again
+                    </button>
+                  </span>
+                )}
               </label>
 
               <label className="block">
-                <span className={labelClass}>Time Slot *</span>
-                <select
-                  value={form.timeSlot}
-                  onChange={(e) => updateField('timeSlot', e.target.value)}
-                  className={inputClass}
-                >
+                <span className={labelClass}>Time Slot{required}</span>
+                <select {...field('timeSlot')} required>
                   <option value="">Select time slot</option>
                   {TIME_SLOTS.map((ts) => (
                     <option key={ts.value} value={ts.value}>{ts.label}</option>
                   ))}
                 </select>
+                {fieldError('timeSlot')}
               </label>
 
               <label className="block">
                 <span className={labelClass}>Allergies / Special Notes</span>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                  rows={3}
-                  className={inputClass}
-                  placeholder="Optional"
-                />
+                <textarea {...field('notes')} rows={3} placeholder="e.g. Allergic to peanuts" />
               </label>
 
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="w-full rounded-2xl bg-[#227EEE] px-4 py-4 text-lg font-black text-white shadow-lg shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
-              >
-                {isSubmitting ? 'Submitting…' : 'Check In'}
-              </button>
-
               {message && (
-                <p className="rounded-2xl bg-blue-50 p-3 text-center text-sm font-bold text-slate-700">
+                <p role="alert" className="rounded-2xl border-2 border-red-100 bg-red-50 p-3 text-sm font-bold text-red-800">
                   {message}
                 </p>
               )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-2xl bg-brand px-4 py-4 text-lg font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
+              >
+                {isSubmitting ? 'Checking in…' : 'Check In'}
+              </button>
             </form>
           )}
         </div>
 
-        <div className="relative mt-6 text-center">
-          <a href="/" className="text-sm font-bold text-slate-400 hover:text-slate-600">
+        <div className="relative mt-4 text-center">
+          <Link href="/" className="inline-block px-4 py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
             ← Back
-          </a>
+          </Link>
         </div>
       </section>
 

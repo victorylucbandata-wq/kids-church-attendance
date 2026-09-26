@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react'
 import { UncheckedMember } from '@/app/lib/types'
 import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
+import Link from 'next/link'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
+import Modal from '@/app/components/Modal'
+import { inputClass } from '@/app/lib/ui'
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -56,7 +59,7 @@ export default function ReturningPage() {
   const [selected, setSelected] = useState<UncheckedMember | null>(null)
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
 
@@ -145,6 +148,16 @@ export default function ReturningPage() {
     setNotes('')
   }
 
+  const showToast = (text: string, ok: boolean) => {
+    setToast({ text, ok })
+    setTimeout(() => setToast(null), ok ? 2500 : 4000)
+  }
+
+  const closeConfirm = () => {
+    setSelected(null)
+    setNotes('')
+  }
+
   const handleCheckIn = async () => {
     if (!selected || loadState.status !== 'ready') return
 
@@ -163,8 +176,7 @@ export default function ReturningPage() {
       const data = await res.json()
 
       if (!data.success) {
-        setToast(data.error ?? 'Check-in failed.')
-        setTimeout(() => setToast(''), 3000)
+        showToast(data.error ?? 'Check-in did not go through. Please try again.', false)
         return
       }
 
@@ -172,8 +184,7 @@ export default function ReturningPage() {
       const checkedName = displayName(selected)
       setSelected(null)
       setNotes('')
-      setToast(`${checkedName} checked in!`)
-      setTimeout(() => setToast(''), 2000)
+      showToast(`${checkedName} checked in!`, true)
 
       if (remaining.length === 0) {
         setLoadState({ status: 'all-done' })
@@ -187,15 +198,11 @@ export default function ReturningPage() {
         setStep('group-select')
       }
     } catch {
-      setToast('Network error. Please try again.')
-      setTimeout(() => setToast(''), 3000)
+      showToast('Could not reach the server. Check your connection and try again.', false)
     } finally {
       setIsSubmitting(false)
     }
   }
-
-  const inputClass =
-    'w-full rounded-2xl border-2 border-blue-100 bg-white px-4 py-3 text-center text-sm text-slate-800 outline-none transition focus:border-[#227EEE] focus:ring-4 focus:ring-blue-100'
 
   const stepLabel =
     step === 'time-slot'
@@ -207,33 +214,38 @@ export default function ReturningPage() {
           : `${selectedGroup} — tap your child's name.`
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 py-6 text-slate-900">
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24 text-slate-900">
       <div className="mx-auto max-w-md">
 
         {/* Header */}
-        <div className="relative mb-6 overflow-hidden rounded-[2rem] border border-blue-100 bg-white p-6 shadow-xl shadow-blue-100/70 text-center">
-          <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-yellow-200/70" />
-          <div className="absolute -right-10 top-20 h-28 w-28 rounded-full bg-blue-200/60" />
+        <div className="relative mb-6 overflow-hidden card p-6 text-center">
+          <div aria-hidden="true" className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-yellow-200/70" />
+          <div aria-hidden="true" className="absolute -right-10 top-20 h-28 w-28 rounded-full bg-blue-200/60" />
           <div className="relative">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[#227EEE] text-3xl shadow-lg shadow-blue-200">
+            <div aria-hidden="true" className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-brand text-3xl shadow-lg shadow-blue-200">
               👋
             </div>
-            <p className="text-sm font-bold uppercase tracking-wide text-[#227EEE]">Kids Church</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">Welcome Back!</h1>
-            <p className="mt-2 text-sm text-slate-500">{stepLabel}</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">Welcome Back!</h1>
+            <p className="mt-2 text-base text-slate-600" aria-live="polite">{stepLabel}</p>
           </div>
         </div>
 
         {/* Toast */}
-        {toast && (
-          <div className="mb-4 rounded-2xl bg-green-500 px-4 py-3 text-center text-sm font-black text-white shadow-lg">
-            {toast}
-          </div>
-        )}
+        <div role="status" aria-live="polite">
+          {toast && (
+            <div
+              className={`mb-4 rounded-2xl px-4 py-3 text-center text-base font-black shadow-lg ${
+                toast.ok ? 'bg-green-700 text-white' : 'border-2 border-red-200 bg-red-50 text-red-800'
+              }`}
+            >
+              {toast.text}
+            </div>
+          )}
+        </div>
 
         {/* Loading */}
         {loadState.status === 'loading' && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-8 shadow-xl shadow-blue-100/70 text-center">
+          <div className="card p-8 text-center">
             <p className="text-slate-500 text-sm">Loading today&apos;s list…</p>
           </div>
         )}
@@ -241,7 +253,7 @@ export default function ReturningPage() {
         {/* No session */}
         {loadState.status === 'no-session' && (
           <div className="rounded-[2rem] border border-yellow-100 bg-white p-8 shadow-xl shadow-yellow-100/70 text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100 text-3xl">⏳</div>
+            <div aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100 text-3xl">⏳</div>
             <p className="font-black text-slate-800">Check-in not open yet</p>
             <p className="text-sm text-slate-500">Please ask a volunteer to start today&apos;s session.</p>
           </div>
@@ -250,7 +262,7 @@ export default function ReturningPage() {
         {/* All done */}
         {loadState.status === 'all-done' && (
           <div className="rounded-[2rem] border border-green-100 bg-white p-8 shadow-xl shadow-green-100/70 text-center space-y-3">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-3xl">🎉</div>
+            <div aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-3xl">🎉</div>
             <p className="font-black text-slate-800">All kids are checked in!</p>
             <p className="text-sm text-slate-500">Everyone has been accounted for today.</p>
           </div>
@@ -259,25 +271,33 @@ export default function ReturningPage() {
         {/* Error */}
         {loadState.status === 'error' && (
           <div className="rounded-[2rem] border border-red-100 bg-white p-8 shadow-xl shadow-red-100/70 text-center space-y-3">
-            <p className="font-black text-red-700">Something went wrong</p>
-            <p className="text-sm text-slate-500">{loadState.message}</p>
+            <p className="font-black text-red-700">Couldn&apos;t load today&apos;s list</p>
+            <p className="text-sm text-slate-600">{loadState.message}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-11 rounded-2xl bg-brand px-6 py-3 text-sm font-black text-white transition hover:bg-brand-strong"
+            >
+              Try again
+            </button>
           </div>
         )}
 
         {/* Step 1: Time slot selection */}
         {loadState.status === 'ready' && step === 'time-slot' && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-xl shadow-blue-100/70">
-            <p className="mb-3 text-center text-xs font-bold uppercase tracking-wide text-slate-400">
+          <div className="card p-4">
+            <p className="mb-3 text-center text-sm font-bold text-slate-700">
               Service Time
             </p>
             <div className="space-y-3">
               {TIME_SLOTS.map((slot) => (
                 <button
                   key={slot.value}
+                  type="button"
                   onClick={() => handleTimeSlotSelect(slot.value)}
-                  className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-blue-100 bg-white px-4 py-4 transition hover:border-[#227EEE] hover:bg-blue-50 active:scale-[0.97]"
+                  className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-blue-100 bg-white px-4 py-4 transition hover:border-brand hover:bg-blue-50 active:scale-[0.97] motion-reduce:active:scale-100"
                 >
-                  <span className="text-2xl">{slot.emoji}</span>
+                  <span aria-hidden="true" className="text-2xl">{slot.emoji}</span>
                   <span className="font-black text-slate-800">{slot.label}</span>
                 </button>
               ))}
@@ -287,8 +307,8 @@ export default function ReturningPage() {
 
         {/* Step 2: Age group selection */}
         {loadState.status === 'ready' && step === 'group-select' && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-xl shadow-blue-100/70">
-            <p className="mb-3 text-center text-xs font-bold uppercase tracking-wide text-slate-400">
+          <div className="card p-4">
+            <p className="mb-3 text-center text-sm font-bold text-slate-700">
               Age Group
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -298,11 +318,11 @@ export default function ReturningPage() {
                   <button
                     key={group}
                     onClick={() => handleGroupSelect(group)}
-                    className="flex min-h-[90px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-4 transition hover:border-[#227EEE] hover:bg-blue-50 active:scale-[0.97]"
+                    className="flex min-h-[90px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-blue-100 bg-white px-4 py-4 transition hover:border-brand hover:bg-blue-50 active:scale-[0.97] motion-reduce:active:scale-100"
                   >
-                    <span className="text-3xl">{GROUP_EMOJIS[group] ?? '👦'}</span>
+                    <span aria-hidden="true" className="text-3xl">{GROUP_EMOJIS[group] ?? '👦'}</span>
                     <span className="font-black text-slate-800 text-sm">{group}</span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-500">
                       {count} {group === SERVE_TEAM ? 'serving' : `kid${count !== 1 ? 's' : ''}`}
                     </span>
                   </button>
@@ -314,7 +334,7 @@ export default function ReturningPage() {
 
         {/* Step 3: Member list filtered by group */}
         {loadState.status === 'ready' && step === 'member-select' && (
-          <div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-xl shadow-blue-100/70 space-y-3">
+          <div className="card p-4 space-y-3">
             {/* Search */}
             <input
               type="text"
@@ -322,10 +342,11 @@ export default function ReturningPage() {
               onChange={(e) => { setSearch(e.target.value); setPage(0); setSelected(null) }}
               placeholder="Search by name…"
               className={inputClass}
+              aria-label="Search by name"
             />
 
             {/* Count */}
-            <p className="text-center text-xs font-bold text-slate-400">
+            <p className="text-center text-xs font-bold text-slate-500">
               {filteredMembers.length}{selectedGroup === SERVE_TEAM ? ' serving' : ` kid${filteredMembers.length !== 1 ? 's' : ''}`}
               {search ? ' found' : ''}
               {totalPages > 1 ? ` · Page ${page + 1} of ${totalPages}` : ''}
@@ -346,7 +367,7 @@ export default function ReturningPage() {
                     onClick={() => handleSelect(member)}
                     className={`w-full rounded-2xl border-2 px-4 py-3 text-center transition ${
                       isSelected
-                        ? 'border-[#227EEE] bg-blue-50'
+                        ? 'border-brand bg-blue-50'
                         : bdayToday
                         ? 'border-yellow-300 bg-yellow-50 hover:border-yellow-400'
                         : bdayWeek
@@ -354,15 +375,15 @@ export default function ReturningPage() {
                         : 'border-blue-100 bg-white hover:border-blue-200 hover:bg-blue-50/50'
                     }`}
                   >
-                    <p className={`font-black text-base leading-tight ${isSelected ? 'text-[#227EEE]' : 'text-slate-800'}`}>
-                      {(bdayToday || bdayWeek) && <span className="mr-1">🎂</span>}
+                    <p className={`font-black text-base leading-tight ${isSelected ? 'text-brand' : 'text-slate-800'}`}>
+                      {(bdayToday || bdayWeek) && <span aria-hidden="true" className="mr-1">🎂</span>}
                       {member.nickname || member.firstName}
                     </p>
-                    <p className={`text-sm leading-tight ${isSelected ? 'text-blue-400' : 'text-slate-500'}`}>
+                    <p className={`text-sm leading-tight ${isSelected ? 'text-brand' : 'text-slate-500'}`}>
                       {member.lastName}, {member.firstName}
                     </p>
                     {bday && (
-                      <p className={`text-xs mt-0.5 ${bdayToday ? 'font-bold text-yellow-600' : bdayWeek ? 'text-yellow-500' : 'text-slate-400'}`}>
+                      <p className={`text-xs mt-0.5 ${bdayToday ? 'font-bold text-yellow-800' : bdayWeek ? 'text-yellow-800' : 'text-slate-500'}`}>
                         {bdayToday ? 'Birthday today!' : bdayWeek ? 'Birthday this week!' : bday}
                       </p>
                     )}
@@ -371,7 +392,7 @@ export default function ReturningPage() {
               })}
 
               {filteredMembers.length === 0 && (
-                <p className="py-4 text-center text-sm text-slate-400">No matching names.</p>
+                <p className="py-4 text-center text-sm text-slate-500">No matching names.</p>
               )}
             </div>
 
@@ -398,39 +419,34 @@ export default function ReturningPage() {
           </div>
         )}
 
-        <div className="mt-6 text-center space-y-2">
+        <div className="mt-4 text-center">
           {(step === 'member-select' || step === 'group-select') && (
             <button
               onClick={handleBack}
-              className="block w-full text-sm font-bold text-[#227EEE] hover:underline"
+              className="block w-full py-3 text-sm font-bold text-brand hover:underline"
             >
               {step === 'member-select' ? '← Change age group' : '← Change time slot'}
             </button>
           )}
-          <a href="/check-in/new" className="block text-sm font-bold text-slate-400 hover:text-slate-600">
+          <Link href="/check-in/new" className="block py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
             First time here? Register instead →
-          </a>
-          <a href="/" className="block text-sm font-bold text-slate-400 hover:text-slate-600">
+          </Link>
+          <Link href="/" className="block py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
             ← Back to home
-          </a>
+          </Link>
         </div>
       </div>
 
-      {/* Check-in confirmation popup */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => { setSelected(null); setNotes('') }}>
-          <div
-            className="w-full max-w-sm rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center">
-              <p className="text-sm font-black text-slate-700">
-                Checking in: <span className="text-[#227EEE]">{displayName(selected)}</span>
-              </p>
-            </div>
+      {/* Check-in confirmation */}
+      <Modal open={!!selected} onClose={closeConfirm} label="Confirm check-in">
+        {selected && (
+          <div className="space-y-4">
+            <p className="text-center text-lg font-black text-balance text-slate-800">
+              Check in <span className="text-brand">{displayName(selected)}</span>?
+            </p>
             <label className="block">
-              <span className="mb-1.5 block text-sm font-bold text-slate-600">
-                Allergies / Notes <span className="font-normal text-slate-400">(optional)</span>
+              <span className="mb-1.5 block text-sm font-bold text-slate-700">
+                Allergies / Notes <span className="font-normal text-slate-600">(optional)</span>
               </span>
               <textarea
                 value={notes}
@@ -441,21 +457,23 @@ export default function ReturningPage() {
               />
             </label>
             <button
+              type="button"
               onClick={handleCheckIn}
               disabled={isSubmitting}
-              className="w-full rounded-2xl bg-[#227EEE] px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:brightness-95 disabled:opacity-60"
+              className="w-full rounded-2xl bg-brand px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
             >
-              {isSubmitting ? 'Checking in…' : `Check In ${displayName(selected)}`}
+              {isSubmitting ? 'Checking in…' : 'Check In'}
             </button>
             <button
-              onClick={() => { setSelected(null); setNotes('') }}
-              className="w-full text-sm font-bold text-slate-400 hover:text-slate-600"
+              type="button"
+              onClick={closeConfirm}
+              className="min-h-11 w-full text-sm font-bold text-slate-600 hover:text-slate-900"
             >
               Cancel
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       <HelpWizard title="How to check in" steps={HELP_STEPS} />
     </main>
