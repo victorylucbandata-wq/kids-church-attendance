@@ -1,4 +1,5 @@
 import { requireAdminPage, type AdminContext } from '@/app/lib/church'
+import { listServiceTimes } from '@/app/lib/service-times'
 import Link from 'next/link'
 import Decor from '@/app/components/Decor'
 
@@ -12,7 +13,7 @@ type SessionRow = {
 
 type AttendanceRow = {
   session_id: string
-  service_times: { label: string; sort_order: number } | null
+  service_time_id: string | null
   members: { role: string; age_groups: { name: string } | null } | null
 }
 
@@ -25,7 +26,7 @@ async function fetchAllAttendance(ctx: AdminContext) {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await ctx.db
       .from('attendance')
-      .select('id, session_id, service_times(label, sort_order), members(role, age_groups(name))')
+      .select('id, session_id, service_time_id, members(role, age_groups(name))')
       .eq('church_id', ctx.church.id)
       .order('id')
       .range(from, from + PAGE - 1)
@@ -71,6 +72,7 @@ export default async function SessionsPage() {
       .order('session_date', { ascending: false }),
     fetchAllAttendance(ctx),
   ])
+  const serviceTimes = new Map((await listServiceTimes(ctx.church.id, { activeOnly: false })).map((st) => [st.id, st]))
 
   const sessions = (sessionData ?? []) as SessionRow[]
   const error = sessionError ?? attendanceError
@@ -119,8 +121,8 @@ export default async function SessionsPage() {
           )}
           {sessions.map((s) => {
             const rows = bySession.get(s.id) ?? []
-            const slotOf = (r: AttendanceRow) => r.service_times?.label ?? '—'
-            const slots = [...new Map(rows.map((r) => [slotOf(r), r.service_times?.sort_order ?? 99]))]
+            const slotOf = (r: AttendanceRow) => (r.service_time_id && serviceTimes.get(r.service_time_id)?.label) || '—'
+            const slots = [...new Map(rows.map((r) => [slotOf(r), (r.service_time_id && serviceTimes.get(r.service_time_id)?.sort_order) || 99]))]
               .sort((a, b) => a[1] - b[1])
               .map(([label]) => label)
 

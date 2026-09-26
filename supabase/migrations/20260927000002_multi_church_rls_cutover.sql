@@ -117,9 +117,8 @@ DROP FUNCTION public.legacy_default_church();
 DROP TRIGGER attendance_fill_service_time ON public.attendance;
 DROP FUNCTION public.attendance_fill_service_time();
 
--- time_slot is kept (nullable) as history for one release; service_time_id is the source of truth.
-ALTER TABLE public.attendance DROP CONSTRAINT attendance_time_slot_check;
-ALTER TABLE public.attendance ALTER COLUMN time_slot DROP NOT NULL;
+-- time_slot (made optional in 20260927000003) is kept as history for one release;
+-- service_time_id is the source of truth from here on.
 ALTER TABLE public.attendance ALTER COLUMN service_time_id SET NOT NULL;
 
 -- Church slugs must not collide with the app's own top-level routes.

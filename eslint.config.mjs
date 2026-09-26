@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
       "app/api/admin/church/**",
       "app/api/admin/team/**",
       "app/api/admin/service-times/**",
+      "app/api/admin/sessions/export/**",
       "app/lib/church.ts",
       "app/lib/kiosk.ts",
       "app/lib/invite.ts",

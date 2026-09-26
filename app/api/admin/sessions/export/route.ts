@@ -2,6 +2,7 @@ import { adminApi, listAccess } from '@/app/lib/church'
 import { createClient } from '@/app/lib/supabase/server'
 import { asText, toCsv } from '@/app/lib/csv'
 import { todayInManila } from '@/app/lib/dates'
+import { createAdminClient } from '@/app/lib/supabase/admin'
 
 // Supabase caps each response at 1,000 rows, so read in pages (same as the Past Sessions page).
 const PAGE = 1000
@@ -10,8 +11,8 @@ type Row = {
   id: string
   session_id: string
   member_id: string
-  service_times: { label: string; sort_order: number } | null
-  churches: { name: string } | null
+  church_id: string
+  service_time_id: string | null
   checked_in_at: string | null
   checked_out_at: string | null
   notes: string | null
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from('attendance')
       .select(
-        'id, session_id, member_id, checked_in_at, checked_out_at, notes, sessions(session_date), service_times(label, sort_order), churches(name), members(first_name, last_name, nickname, role, birthday, parent_name, contact_number, age_groups(name))'
+        'id, church_id, session_id, member_id, service_time_id, checked_in_at, checked_out_at, notes, sessions(session_date), members(first_name, last_name, nickname, role, birthday, parent_name, contact_number, age_groups(name))'
       )
       .order('id')
       .range(from, from + PAGE - 1)
@@ -78,11 +79,23 @@ export async function GET(request: Request) {
   const { data: firstTimers } = await ftQuery
   const firstTimerKeys = new Set((firstTimers ?? []).map((f) => `${f.session_id}:${f.member_id}`))
 
+  // Church names and service-time labels are configuration: look them up with the secret key
+  // (only for the churches whose rows this person could already read above).
+  const admin = createAdminClient()
+  const churchIds = [...new Set(rows.map((r) => r.church_id))]
+  const [{ data: churchRows }, { data: timeRows }] = await Promise.all([
+    admin.from('churches').select('id, name').in('id', churchIds),
+    admin.from('service_times').select('id, label, sort_order').in('church_id', churchIds),
+  ])
+  const churchName = new Map((churchRows ?? []).map((c) => [c.id, c.name as string]))
+  const slot = new Map((timeRows ?? []).map((t) => [t.id, t as { label: string; sort_order: number }]))
+  const slotOf = (r: Row) => (r.service_time_id ? slot.get(r.service_time_id) : undefined)
+
   rows.sort(
     (a, b) =>
-      (a.churches?.name ?? '').localeCompare(b.churches?.name ?? '') ||
+      (churchName.get(a.church_id) ?? '').localeCompare(churchName.get(b.church_id) ?? '') ||
       (a.sessions?.session_date ?? '').localeCompare(b.sessions?.session_date ?? '') ||
-      (a.service_times?.sort_order ?? 99) - (b.service_times?.sort_order ?? 99) ||
+      (slotOf(a)?.sort_order ?? 99) - (slotOf(b)?.sort_order ?? 99) ||
       (a.members?.last_name ?? '').localeCompare(b.members?.last_name ?? '') ||
       (a.members?.first_name ?? '').localeCompare(b.members?.first_name ?? '')
   )
@@ -99,10 +112,10 @@ export async function GET(request: Request) {
       const m = r.members
       const date = r.sessions?.session_date ?? ''
       return [
-        r.churches?.name,
+        churchName.get(r.church_id),
         date,
         date ? weekday(date) : '',
-        r.service_times?.label,
+        slotOf(r)?.label,
         m?.last_name,
         m?.first_name,
         m?.nickname,
