@@ -18,9 +18,12 @@ export async function POST(request: Request) {
     options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm` },
   })
 
-  // Rate limiting is the only error worth surfacing; "no such user" stays silent.
+  // "No such user" stays silent (so this can't probe who has access); real failures don't.
   if (error && error.status === 429) {
     return Response.json({ success: false, error: 'Too many sign-in requests. Wait a minute and try again.' }, { status: 429 })
+  }
+  if (error && (error.status ?? 0) >= 500) {
+    return Response.json({ success: false, error: 'We couldn\'t send the email just now. Try again in a minute, or ask your church lead.' }, { status: 502 })
   }
 
   const store = await cookies()
