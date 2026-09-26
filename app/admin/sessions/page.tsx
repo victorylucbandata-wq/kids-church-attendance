@@ -1,9 +1,6 @@
-import { requireAdmin } from '@/app/lib/auth'
-import { createClient } from '@/app/lib/supabase/server'
+import { requireAdminPage, type AdminContext } from '@/app/lib/church'
 import Link from 'next/link'
 import Decor from '@/app/components/Decor'
-
-const SLOT_ORDER = ['9am', '11am', 'Special']
 
 type SessionRow = {
   id: string
@@ -15,7 +12,7 @@ type SessionRow = {
 
 type AttendanceRow = {
   session_id: string
-  time_slot: string | null
+  service_times: { label: string; sort_order: number } | null
   members: { role: string; age_groups: { name: string } | null } | null
 }
 
@@ -23,12 +20,13 @@ type AttendanceRow = {
 // until a short page comes back; otherwise older sessions silently lose rows.
 const PAGE = 1000
 
-async function fetchAllAttendance(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function fetchAllAttendance(ctx: AdminContext) {
   const rows: AttendanceRow[] = []
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+    const { data, error } = await ctx.db
       .from('attendance')
-      .select('id, session_id, time_slot, members(role, age_groups(name))')
+      .select('id, session_id, service_times(label, sort_order), members(role, age_groups(name))')
+      .eq('church_id', ctx.church.id)
       .order('id')
       .range(from, from + PAGE - 1)
     if (error) return { rows, error }
@@ -64,15 +62,14 @@ function CountCard({ label, rows }: { label: string; rows: AttendanceRow[] }) {
 }
 
 export default async function SessionsPage() {
-  await requireAdmin()
-
-  const supabase = await createClient()
+  const ctx = await requireAdminPage()
   const [{ data: sessionData, error: sessionError }, { rows: attendance, error: attendanceError }] = await Promise.all([
-    supabase
+    ctx.db
       .from('sessions')
       .select('id, session_date, generated_at, attendance(count), first_timers(count)')
+      .eq('church_id', ctx.church.id)
       .order('session_date', { ascending: false }),
-    fetchAllAttendance(supabase),
+    fetchAllAttendance(ctx),
   ])
 
   const sessions = (sessionData ?? []) as SessionRow[]
@@ -122,9 +119,10 @@ export default async function SessionsPage() {
           )}
           {sessions.map((s) => {
             const rows = bySession.get(s.id) ?? []
-            const slots = [...new Set(rows.map((r) => r.time_slot ?? '—'))].sort(
-              (a, b) => (SLOT_ORDER.indexOf(a) + 1 || 99) - (SLOT_ORDER.indexOf(b) + 1 || 99)
-            )
+            const slotOf = (r: AttendanceRow) => r.service_times?.label ?? '—'
+            const slots = [...new Map(rows.map((r) => [slotOf(r), r.service_times?.sort_order ?? 99]))]
+              .sort((a, b) => a[1] - b[1])
+              .map(([label]) => label)
 
             return (
               <details key={s.id} className="group px-6 py-4">
@@ -144,7 +142,7 @@ export default async function SessionsPage() {
                     </p>
                     <p className="text-xs font-bold text-slate-500">
                       {slots.length > 0
-                        ? slots.map((slot) => `${slot}: ${rows.filter((r) => (r.time_slot ?? '—') === slot).length}`).join(' · ')
+                        ? slots.map((slot) => `${slot}: ${rows.filter((r) => slotOf(r) === slot).length}`).join(' · ')
                         : 'Nobody checked in'}
                     </p>
                     {s.first_timers[0]?.count > 0 && (
@@ -163,7 +161,7 @@ export default async function SessionsPage() {
                   <div className="mt-4 space-y-3">
                     <CountCard label="Whole day by age group" rows={rows} />
                     {slots.map((slot) => (
-                      <CountCard key={slot} label={slot} rows={rows.filter((r) => (r.time_slot ?? '—') === slot)} />
+                      <CountCard key={slot} label={slot} rows={rows.filter((r) => slotOf(r) === slot)} />
                     ))}
                     <a
                       href={`/api/admin/sessions/export?session=${s.id}`}

@@ -1,25 +1,29 @@
-import { isAdmin } from '@/app/lib/auth'
-import { createClient } from '@/app/lib/supabase/server'
+import { adminApi } from '@/app/lib/church'
 
+// Manual check-in from the dashboard.
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const ctx = await adminApi({ write: true })
+  if (ctx instanceof Response) return ctx
+
+  const { memberId, sessionId, serviceTimeId, notes } = await request.json()
+
+  if (!memberId || !sessionId || !serviceTimeId) {
+    return Response.json({ success: false, error: 'Choose a member and a service time.' }, { status: 400 })
   }
 
-  const { memberId, sessionId, timeSlot, notes } = await request.json()
+  // The database rejects rows that mix churches; this gives a friendlier message first.
+  const { data: session } = await ctx.db
+    .from('sessions').select('id').eq('id', sessionId).eq('church_id', ctx.church.id).maybeSingle()
+  if (!session) return Response.json({ success: false, error: 'That session is not part of this church.' }, { status: 404 })
 
-  if (!memberId || !sessionId || !timeSlot) {
-    return Response.json({ success: false, error: 'memberId, sessionId, and timeSlot are required.' }, { status: 400 })
-  }
-
-  const supabase = await createClient()
-
-  const { error } = await supabase.from('attendance').insert({
+  const { error } = await ctx.db.from('attendance').insert({
+    church_id: ctx.church.id,
     session_id: sessionId,
     member_id: memberId,
-    time_slot: timeSlot,
+    service_time_id: serviceTimeId,
     checked_in: true,
     checked_in_at: new Date().toISOString(),
+    checked_in_by: ctx.userId,
     notes: notes || null,
   })
 
@@ -33,18 +37,19 @@ export async function POST(request: Request) {
   return Response.json({ success: true })
 }
 
+// Check-out (one child, or everyone still here), and service-time corrections.
 export async function PATCH(request: Request) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi({ write: true })
+  if (ctx instanceof Response) return ctx
 
-  const { attendanceId, sessionId, timeSlot, checkedOut, bulkCheckoutAll } = await request.json()
+  const { attendanceId, sessionId, serviceTimeId, checkedOut, bulkCheckoutAll } = await request.json()
+  const now = new Date().toISOString()
 
   if (bulkCheckoutAll && sessionId) {
-    const supabase = await createClient()
-    const { error } = await supabase
+    const { error } = await ctx.db
       .from('attendance')
-      .update({ checked_out_at: new Date().toISOString() })
+      .update({ checked_out_at: now, checked_out_by: ctx.userId })
+      .eq('church_id', ctx.church.id)
       .eq('session_id', sessionId)
       .eq('checked_in', true)
       .is('checked_out_at', null)
@@ -59,16 +64,18 @@ export async function PATCH(request: Request) {
     return Response.json({ success: false, error: 'attendanceId is required.' }, { status: 400 })
   }
 
-  const supabase = await createClient()
   const updates: Record<string, unknown> = {}
+  if (serviceTimeId) updates.service_time_id = serviceTimeId
+  if (checkedOut) {
+    updates.checked_out_at = now
+    updates.checked_out_by = ctx.userId
+  }
 
-  if (timeSlot) updates.time_slot = timeSlot
-  if (checkedOut) updates.checked_out_at = new Date().toISOString()
-
-  const { error } = await supabase
+  const { error } = await ctx.db
     .from('attendance')
     .update(updates)
     .eq('id', attendanceId)
+    .eq('church_id', ctx.church.id)
 
   if (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 })

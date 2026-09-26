@@ -1,17 +1,17 @@
-import { isAdmin } from '@/app/lib/auth'
+import { adminApi, listAccess } from '@/app/lib/church'
 import { createClient } from '@/app/lib/supabase/server'
 import { asText, toCsv } from '@/app/lib/csv'
+import { todayInManila } from '@/app/lib/dates'
 
 // Supabase caps each response at 1,000 rows, so read in pages (same as the Past Sessions page).
 const PAGE = 1000
-const SLOT_ORDER = ['9am', '11am', 'Special']
-const SLOT_LABEL: Record<string, string> = { '9am': '9:00 AM', '11am': '11:00 AM', Special: 'Special Event' }
 
 type Row = {
   id: string
   session_id: string
   member_id: string
-  time_slot: string | null
+  service_times: { label: string; sort_order: number } | null
+  churches: { name: string } | null
   checked_in_at: string | null
   checked_out_at: string | null
   notes: string | null
@@ -35,22 +35,35 @@ const weekday = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long' })
 
 export async function GET(request: Request) {
-  if (!(await isAdmin())) {
-    return new Response('Please sign in as admin to export.', { status: 401 })
-  }
+  const params = new URL(request.url).searchParams
+  const sessionId = params.get('session')
 
-  const sessionId = new URL(request.url).searchParams.get('session')
-  const supabase = await createClient()
+  // ?scope=network: every church, for network admins. Otherwise: the current church only.
+  let supabase: Awaited<ReturnType<typeof createClient>>
+  let churchId: string | null = null
+  if (params.get('scope') === 'network') {
+    supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !(await listAccess(user.id)).isNetworkAdmin) {
+      return new Response('Network admins only.', { status: 403 })
+    }
+  } else {
+    const ctx = await adminApi()
+    if (ctx instanceof Response) return new Response('Please sign in to export.', { status: ctx.status })
+    supabase = ctx.db
+    churchId = ctx.church.id
+  }
 
   const rows: Row[] = []
   for (let from = 0; ; from += PAGE) {
     let query = supabase
       .from('attendance')
       .select(
-        'id, session_id, member_id, time_slot, checked_in_at, checked_out_at, notes, sessions(session_date), members(first_name, last_name, nickname, role, birthday, parent_name, contact_number, age_groups(name))'
+        'id, session_id, member_id, checked_in_at, checked_out_at, notes, sessions(session_date), service_times(label, sort_order), churches(name), members(first_name, last_name, nickname, role, birthday, parent_name, contact_number, age_groups(name))'
       )
       .order('id')
       .range(from, from + PAGE - 1)
+    if (churchId) query = query.eq('church_id', churchId)
     if (sessionId) query = query.eq('session_id', sessionId)
     const { data, error } = await query
     if (error) return new Response(`Export failed: ${error.message}`, { status: 500 })
@@ -60,24 +73,25 @@ export async function GET(request: Request) {
 
   // First timers are recorded per session, so mark the row for that session only.
   let ftQuery = supabase.from('first_timers').select('session_id, member_id')
+  if (churchId) ftQuery = ftQuery.eq('church_id', churchId)
   if (sessionId) ftQuery = ftQuery.eq('session_id', sessionId)
   const { data: firstTimers } = await ftQuery
   const firstTimerKeys = new Set((firstTimers ?? []).map((f) => `${f.session_id}:${f.member_id}`))
 
-  const slotRank = (s: string | null) => (SLOT_ORDER.indexOf(s ?? '') + 1) || 99
   rows.sort(
     (a, b) =>
+      (a.churches?.name ?? '').localeCompare(b.churches?.name ?? '') ||
       (a.sessions?.session_date ?? '').localeCompare(b.sessions?.session_date ?? '') ||
-      slotRank(a.time_slot) - slotRank(b.time_slot) ||
+      (a.service_times?.sort_order ?? 99) - (b.service_times?.sort_order ?? 99) ||
       (a.members?.last_name ?? '').localeCompare(b.members?.last_name ?? '') ||
       (a.members?.first_name ?? '').localeCompare(b.members?.first_name ?? '')
   )
 
   const header = [
-    'Date', 'Day', 'Time Slot', 'Last Name', 'First Name', 'Nickname', 'Role', 'Age Group',
+    'Church', 'Date', 'Day', 'Time Slot', 'Last Name', 'First Name', 'Nickname', 'Role', 'Age Group',
     'First Timer', 'Checked In', 'Checked Out', 'Birthday', 'Parent / Guardian', 'Contact Number', 'Notes',
   ]
-  const CONTACT_COLUMN = 13
+  const CONTACT_COLUMN = 14
 
   const body = toCsv(
     header,
@@ -85,9 +99,10 @@ export async function GET(request: Request) {
       const m = r.members
       const date = r.sessions?.session_date ?? ''
       return [
+        r.churches?.name,
         date,
         date ? weekday(date) : '',
-        SLOT_LABEL[r.time_slot ?? ''] ?? r.time_slot,
+        r.service_times?.label,
         m?.last_name,
         m?.first_name,
         m?.nickname,
@@ -105,11 +120,12 @@ export async function GET(request: Request) {
     [CONTACT_COLUMN]
   )
 
-  const stamp = sessionId ? rows[0]?.sessions?.session_date ?? 'session' : `all-${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`
+  const prefix = churchId ? 'kids-church-attendance' : 'kids-church-network'
+  const stamp = sessionId ? rows[0]?.sessions?.session_date ?? 'session' : `all-${todayInManila()}`
   return new Response(body, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="kids-church-attendance-${stamp}.csv"`,
+      'Content-Disposition': `attachment; filename="${prefix}-${stamp}.csv"`,
       'Cache-Control': 'no-store',
     },
   })

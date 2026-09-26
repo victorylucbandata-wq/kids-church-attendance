@@ -1,5 +1,3 @@
-export type TimeSlot = '9am' | '11am' | 'Special'
-
 export type Role = 'child' | 'volunteer'
 
 export type AgeGroup = {
@@ -32,7 +30,8 @@ export type AttendanceRow = {
   nickname: string | null
   ageGroup: string
   role: Role
-  timeSlot: TimeSlot | null
+  /** Service time label for this church, e.g. "9:00 AM". */
+  timeSlot: string | null
   checkedIn: boolean
   checkedInAt: string | null
   checkedOutAt: string | null
@@ -53,7 +52,12 @@ export type FirstTimerRecord = {
   notes: string | null
 }
 
+export type ServiceTimeOption = { id: string; label: string }
+
 export type AdminData = {
+  church: { id: string; name: string; slug: string }
+  role: 'lead' | 'volunteer' | 'network'
+  serviceTimes: ServiceTimeOption[]
   session: Session | null
   attendanceRows: AttendanceRow[]
   firstTimers: FirstTimerRecord[]

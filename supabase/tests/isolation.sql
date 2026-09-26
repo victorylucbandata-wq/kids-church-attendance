@@ -168,16 +168,15 @@ DO $$ BEGIN
 EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS 6';
 END $$;
 
-\echo '7. user_id_by_email is not callable by signed-in users'
-SET LOCAL ROLE authenticated;
+\echo '6b. a member cannot point at another church''s age group'
 DO $$ BEGIN
-  PERFORM public.user_id_by_email('lead_a@isolation.test');
-  RAISE EXCEPTION 'FAIL 7: authenticated can look up users by email';
-EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS 7';
+  UPDATE members SET age_group_id = (SELECT id FROM age_groups WHERE church_id = (SELECT id FROM t WHERE k='church_b'))
+  WHERE church_id = (SELECT id FROM t WHERE k='church_a');
+  RAISE EXCEPTION 'FAIL 6b: cross-church age group accepted';
+EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS 6b';
 END $$;
-RESET ROLE;
 
-\echo '8. existing Lucban data untouched by the tests'
+\echo '7. existing Lucban data untouched by the tests'
 SELECT count(*) AS lucban_members FROM members WHERE church_id = (SELECT id FROM churches WHERE slug = 'lucban');
 
 ROLLBACK;

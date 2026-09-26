@@ -17,18 +17,10 @@ CREATE FUNCTION public.is_church_lead(target UUID) RETURNS BOOLEAN
   SELECT EXISTS (SELECT 1 FROM church_memberships WHERE church_id = target AND user_id = auth.uid() AND role = 'lead')
 $$;
 
--- Server-only lookup for invites (auth.users is not queryable through the API).
-CREATE FUNCTION public.user_id_by_email(lookup TEXT) RETURNS UUID
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, auth AS $$
-  SELECT id FROM auth.users WHERE lower(email) = lower(lookup) LIMIT 1
-$$;
-
 REVOKE EXECUTE ON FUNCTION public.is_network_admin()      FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.is_church_lead(UUID)     FROM PUBLIC, anon;
-REVOKE EXECUTE ON FUNCTION public.user_id_by_email(TEXT)   FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.is_network_admin()      TO authenticated;
 GRANT  EXECUTE ON FUNCTION public.is_church_lead(UUID)     TO authenticated;
-GRANT  EXECUTE ON FUNCTION public.user_id_by_email(TEXT)   TO service_role;
 
 -- 2. Remove the old wide-open policies on the kids tables -------------------------
 
@@ -94,6 +86,24 @@ CREATE POLICY memberships_lead_delete ON public.church_memberships FOR DELETE TO
 
 CREATE POLICY network_admins_self ON public.network_admins FOR SELECT TO authenticated
   USING (user_id = auth.uid());
+
+-- 3b. An age group reference must stay inside the church ----------------------------
+
+CREATE FUNCTION public.age_group_same_church() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.age_group_id IS NOT NULL
+     AND (SELECT church_id FROM age_groups WHERE id = NEW.age_group_id) IS DISTINCT FROM NEW.church_id THEN
+    RAISE EXCEPTION 'age group belongs to another church' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE EXECUTE ON FUNCTION public.age_group_same_church() FROM PUBLIC, anon, authenticated;
+
+CREATE TRIGGER members_age_group_same_church BEFORE INSERT OR UPDATE OF age_group_id, church_id ON public.members
+  FOR EACH ROW EXECUTE FUNCTION public.age_group_same_church();
+CREATE TRIGGER first_timers_age_group_same_church BEFORE INSERT OR UPDATE OF age_group_id, church_id ON public.first_timers
+  FOR EACH ROW EXECUTE FUNCTION public.age_group_same_church();
 
 -- 4. Retire the transition scaffolding from 20260927000001 -------------------------
 

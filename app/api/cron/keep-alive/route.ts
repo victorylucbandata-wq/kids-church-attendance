@@ -1,13 +1,14 @@
-import { createClient } from '@/app/lib/supabase/server'
+import { createAdminClient } from '@/app/lib/supabase/admin'
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const supabase = await createClient()
+    // Secret key: after the RLS cutover the publishable key can read nothing.
+    const supabase = createAdminClient()
 
     const { error } = await supabase.from('age_groups').select('id').limit(1)
 
