@@ -57,6 +57,7 @@ export type ServiceTimeOption = { id: string; label: string }
 export type AdminData = {
   church: { id: string; name: string; slug: string }
   role: 'lead' | 'volunteer' | 'network'
+  email: string
   serviceTimes: ServiceTimeOption[]
   session: Session | null
   attendanceRows: AttendanceRow[]

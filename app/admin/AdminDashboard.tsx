@@ -176,6 +176,13 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
               {' · '}
               <Link href="/admin/choose" className="font-bold text-brand hover:underline">Switch church</Link>
             </p>
+            {data?.email && (
+              <p className="text-sm text-slate-600">
+                Signed in as <span className="font-bold text-slate-800">{data.email}</span>
+                {' · '}
+                {data.role === 'lead' ? 'Lead' : data.role === 'volunteer' ? 'Volunteer' : 'Network admin (view only)'}
+              </p>
+            )}
           </div>
           <SignOutButton className="min-h-11 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60" />
         </div>
