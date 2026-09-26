@@ -203,7 +203,7 @@ so it lives in tested app code instead. n8n still sends every email.
 4. Invite Lucban's other leaders from Team; they sign in before Sunday.
 5. Old kiosk QR codes land on the church picker; parents tap Lucban once.
 
-**Rollback:** before step 3, revert the merge (old code and database still match). After step 3, revert the merge **and** restore the pre-cutover policies from the backup (`pg_restore --section=post-data` is not enough on its own; re-create the anon policies listed in open item 7), so revert the code within minutes if anything is wrong.
+**Rollback:** before step 3, revert the merge (old code and database still match). After step 3, revert the merge **and** run `supabase/rollback/20260927000002_down.sql`, which restores the pre-cutover policies, defaults and transition trigger (tested 2026-09-27: after it, the old app's check-in works again).
 
 ## 6. Isolation tests (required before any second church's data exists)
 
