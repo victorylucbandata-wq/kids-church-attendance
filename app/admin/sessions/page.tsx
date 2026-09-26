@@ -94,9 +94,21 @@ export default async function SessionsPage() {
           <p className="text-sm text-slate-600">{sessions.length} sessions recorded</p>
         </div>
 
-        <Link href="/admin" className="inline-block rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
-          ← Back to Dashboard
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin" className="inline-flex min-h-11 items-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
+            ← Back to Dashboard
+          </Link>
+          {sessions.length > 0 && (
+            // Plain <a>: this is a file download, not a page navigation.
+            <a
+              href="/api/admin/sessions/export"
+              download
+              className="inline-flex min-h-11 items-center rounded-2xl bg-brand px-4 py-2.5 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong"
+            >
+              Download all sessions (CSV)
+            </a>
+          )}
+        </div>
 
         {error && (
           <div role="alert" className="rounded-2xl border-2 border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
@@ -153,6 +165,13 @@ export default async function SessionsPage() {
                     {slots.map((slot) => (
                       <CountCard key={slot} label={slot} rows={rows.filter((r) => (r.time_slot ?? '—') === slot)} />
                     ))}
+                    <a
+                      href={`/api/admin/sessions/export?session=${s.id}`}
+                      download
+                      className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50"
+                    >
+                      Download this session (CSV)
+                    </a>
                   </div>
                 )}
               </details>
