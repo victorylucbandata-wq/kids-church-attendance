@@ -9,18 +9,27 @@ const TYPES: EmailOtpType[] = ['magiclink', 'invite', 'email', 'signup']
 const PERSONAL_DEVICE = 60 * 60 * 24 * 30
 const SHARED_DEVICE = 60 * 60 * 12
 
-// Landing page for the emailed sign-in and invite links.
+// Landing page for the emailed sign-in and invite links. Two link formats arrive here:
+//  - ?token_hash=&type=  from our own email (Send Email hook -> n8n)
+//  - ?code=              from Supabase's built-in email / SMTP fallback (PKCE; the code
+//                        verifier cookie was set when the link was requested on this browser)
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const tokenHash = url.searchParams.get('token_hash')
   const type = url.searchParams.get('type') as EmailOtpType | null
+  const code = url.searchParams.get('code')
   const fail = NextResponse.redirect(new URL('/admin/login?link=invalid', url))
 
-  if (!tokenHash || !type || !TYPES.includes(type)) return fail
-
   const supabase = await createClient()
-  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
-  if (error) return fail
+  if (tokenHash && type && TYPES.includes(type)) {
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
+    if (error) return fail
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) return fail
+  } else {
+    return fail
+  }
 
   const store = await cookies()
   // Invites are opened on the invitee's own phone; treat them as personal devices.
