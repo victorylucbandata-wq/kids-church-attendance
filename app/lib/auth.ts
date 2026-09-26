@@ -1,28 +1,34 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { createSessionToken, isValidSessionToken, safeEqual } from '@/app/lib/session-token'
 
 const COOKIE_NAME = 'admin_session'
-const COOKIE_VALUE = 'authenticated'
+const MAX_AGE = 60 * 60 * 8
 
 export async function requireAdmin(): Promise<void> {
-  const store = await cookies()
-  if (store.get(COOKIE_NAME)?.value !== COOKIE_VALUE) {
+  if (!(await isAdmin())) {
     redirect('/admin/login')
   }
 }
 
 export async function isAdmin(): Promise<boolean> {
   const store = await cookies()
-  return store.get(COOKIE_NAME)?.value === COOKIE_VALUE
+  return isValidSessionToken(store.get(COOKIE_NAME)?.value, process.env.ADMIN_PASSWORD)
+}
+
+export function isCorrectPassword(password: string | undefined): boolean {
+  const expected = process.env.ADMIN_PASSWORD
+  return !!password && !!expected && safeEqual(password, expected)
 }
 
 export async function setAdminCookie(): Promise<void> {
   const store = await cookies()
-  store.set(COOKIE_NAME, COOKIE_VALUE, {
+  store.set(COOKIE_NAME, createSessionToken(process.env.ADMIN_PASSWORD!, MAX_AGE), {
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 8,
+    maxAge: MAX_AGE,
   })
 }
 
