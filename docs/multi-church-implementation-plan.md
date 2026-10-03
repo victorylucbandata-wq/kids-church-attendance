@@ -199,7 +199,7 @@ so it lives in tested app code instead. n8n still sends every email.
 **Deploy day (a weekday), about an hour. Only once most Lucban leaders have sent their emails:**
 1. Merge PR #5; wait for the production deploy. GitHub retargets PR #6 to `main` when the stage 1 branch is deleted.
 2. The network admin signs in at `/admin/login` (account and Lucban Lead membership were created 2026-09-27) and confirms the email arrives.
-3. Backup, dry run, apply, verify (from the app folder; `psql` is at `/opt/homebrew/opt/libpq/bin`):
+3. Backup, dry run, apply, verify (from the app folder, after `export $(grep ^SUPABASE_DB_URL= .env.local)`; `psql` is at `/opt/homebrew/opt/libpq/bin`):
    - `pg_dump "$SUPABASE_DB_URL" --schema=public --format=custom -f ~/kids-church-attendance/backups/pre-cutover-$(date +%F).dump`
    - Dry run: `(echo 'BEGIN;'; cat supabase/migrations/20260927000002_multi_church_rls_cutover.sql; echo 'ROLLBACK;') | psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1`
    - Apply: `psql "$SUPABASE_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f supabase/migrations/20260927000002_multi_church_rls_cutover.sql`
