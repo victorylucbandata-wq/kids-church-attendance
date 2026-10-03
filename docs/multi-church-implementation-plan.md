@@ -196,12 +196,18 @@ so it lives in tested app code instead. n8n still sends every email.
 3. Supabase, Authentication > Hooks > Send Email: HTTPS, URL `https://<production>/api/auth/send-email`, generate the secret, and copy it.
 4. Vercel, Settings > Environment Variables (Production and Preview): `SUPABASE_SECRET_KEY`, `SESSION_SECRET`, `N8N_MAILER_WEBHOOK_URL`, `N8N_MAILER_TOKEN` (copy from `.env.local`), and `SEND_EMAIL_HOOK_SECRET` (from step 3). Keep `ADMIN_PASSWORD` until after the first Sunday.
 
-**Deploy day (a weekday):**
-1. Merge the stage 1 PR; wait for the production deploy.
+**Deploy day (a weekday), about an hour. Only once most Lucban leaders have sent their emails:**
+1. Merge PR #5; wait for the production deploy. GitHub retargets PR #6 to `main` when the stage 1 branch is deleted.
 2. The network admin signs in at `/admin/login` (account and Lucban Lead membership were created 2026-09-27) and confirms the email arrives.
-3. Apply `supabase/migrations/20260927000002_multi_church_rls_cutover.sql` (dry run first), then run `supabase/tests/isolation.sql` with `apply_cutover=0`, plus the end-to-end script against production.
-4. Invite Lucban's other leaders from Team; they sign in before Sunday.
-5. Old kiosk QR codes land on the church picker; parents tap Lucban once.
+3. Backup, dry run, apply, verify (from the app folder; `psql` is at `/opt/homebrew/opt/libpq/bin`):
+   - `pg_dump "$SUPABASE_DB_URL" --schema=public --format=custom -f ~/kids-church-attendance/backups/pre-cutover-$(date +%F).dump`
+   - Dry run: `(echo 'BEGIN;'; cat supabase/migrations/20260927000002_multi_church_rls_cutover.sql; echo 'ROLLBACK;') | psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1`
+   - Apply: `psql "$SUPABASE_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f supabase/migrations/20260927000002_multi_church_rls_cutover.sql`
+   - `psql "$SUPABASE_DB_URL" -X -q -v apply_cutover=0 -f supabase/tests/isolation.sql`
+   - `node --env-file=.env.local scripts/e2e.mjs https://<production address>` (44 checks; throwaway church and users, removed after)
+4. Merge PR #6 (member import, privacy notice); re-run `scripts/e2e.mjs` against production.
+5. Invite Lucban's other leaders from Team; they sign in before Sunday.
+6. Old kiosk QR codes land on the church picker; parents tap Lucban once.
 
 **Rollback:** before step 3, revert the merge (old code and database still match). After step 3, revert the merge **and** run `supabase/rollback/20260927000002_down.sql`, which restores the pre-cutover policies, defaults and transition trigger (tested 2026-09-27: after it, the old app's check-in works again).
 
