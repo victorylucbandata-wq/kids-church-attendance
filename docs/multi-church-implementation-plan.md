@@ -237,7 +237,7 @@ The source of truth for "where are we". Each entry records what changed since th
 |---|---|---|
 | 1 | n8n host, uptime, and whether it is reachable from Supabase over HTTPS | Network admin |
 | 2 | Personal Gmail daily sending limit (not documented on Google's Workspace limits page) | Network admin, if volume grows |
-| 3 | Data-sharing agreement or parent privacy notice under RA 10173 | Network leadership (stage 2 gate) |
+| 3 | Data-sharing agreement or parent privacy notice under RA 10173. **Partly done 2026-10-03:** First Timer form shows a privacy notice and requires a consent tick (server-enforced; a registration is the record of consent). Still needed: leadership review of the wording, a named contact for data requests, the church agreement, and notice for members registered before it. | Network leadership (stage 2 gate) |
 | 4 | Pilot church | Network leadership (stage 2 gate) |
 | 5 | Domain | Network admin (stage 3 gate) |
 | 6 | ~~`first_timers` shows 0 rows to the app.~~ **Resolved 2026-09-27:** 39 rows exist; the publishable key may insert but not read them, so dashboard, Past Sessions and export showed 0. Fixed by step 1.2 (admin reads as the signed-in user). | Done |
