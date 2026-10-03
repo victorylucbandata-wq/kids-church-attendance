@@ -371,7 +371,7 @@ export default function FirstTimerPage() {
               <div className="rounded-2xl border-2 border-blue-100 bg-blue-50/60 p-4 text-sm leading-relaxed text-slate-700">
                 <p className="font-black text-slate-900">Privacy notice</p>
                 <p className="mt-1">
-                  {churchName || 'Our church'} keeps your child&apos;s details, your name and contact number, and any notes
+                  {churchName || 'Our church'}{' '}keeps your child&apos;s details, your name and contact number, and any notes
                   (including allergies) only to check your child in and keep them safe during service. Only our Kids Church
                   leaders can see them, and they are not shared outside the church. To see, correct or delete your
                   details, talk to any Kids Church leader.
