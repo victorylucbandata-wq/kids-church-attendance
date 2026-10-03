@@ -1,9 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // The old Sheets-era form lived here; send any saved links to the current check-in.
+  // Old links: the Sheets-era form and the single-church kiosk paths.
   async redirects() {
-    return [{ source: "/kids-attendance", destination: "/", permanent: false }];
+    return [
+      { source: "/kids-attendance", destination: "/", permanent: false },
+      // Pre-multi-church kiosk links (and QR codes) land on the church picker.
+      { source: "/check-in/:path*", destination: "/", permanent: false },
+    ];
   },
 };
 

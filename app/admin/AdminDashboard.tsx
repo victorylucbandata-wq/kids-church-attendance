@@ -7,6 +7,7 @@ import { AdminData } from '@/app/lib/types'
 import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
 import { requestJson } from '@/app/lib/api'
+import SignOutButton from './SignOutButton'
 import { inputClass } from '@/app/lib/ui'
 import Decor from '@/app/components/Decor'
 
@@ -39,17 +40,10 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🔒',
     title: 'When you\'re done',
-    body: 'Tap Logout to secure the page. You don\'t need to "close" the session — a new one is started next service day.',
+    body: 'Tap Sign out on a shared device. You don\'t need to "close" the session — a new one is started next service day.',
   },
 ]
 
-const TIME_SLOTS = [
-  { value: '9am', label: '9:00 AM' },
-  { value: '11am', label: '11:00 AM' },
-  { value: 'Special', label: 'Special Event' },
-]
-
-const slotLabel = (value: string | null) => TIME_SLOTS.find((t) => t.value === value)?.label ?? value ?? '—'
 
 type Props = {
   initialData: (AdminData & { success: boolean }) | null
@@ -62,10 +56,9 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
   const [error] = useState(initialError)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateMsg, setGenerateMsg] = useState('')
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showManualCheckIn, setShowManualCheckIn] = useState(false)
   const [manualMemberId, setManualMemberId] = useState('')
-  const [manualTimeSlot, setManualTimeSlot] = useState('9am')
+  const [manualServiceTimeId, setManualServiceTimeId] = useState(initialData?.serviceTimes[0]?.id ?? '')
   const [manualSubmitting, setManualSubmitting] = useState(false)
   const [checkingOutId, setCheckingOutId] = useState<string | null>(null)
   const [bulkCheckingOut, setBulkCheckingOut] = useState(false)
@@ -120,15 +113,6 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
     }
   }
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    try {
-      await fetch('/api/admin/logout', { method: 'POST' })
-    } finally {
-      router.push('/admin/login')
-    }
-  }
-
   // Sends an attendance change; returns true on success, otherwise shows the error inline.
   const sendAttendance = async (method: 'POST' | 'PATCH', body: object) => {
     setActionError('')
@@ -147,7 +131,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
     const ok = await sendAttendance('POST', {
       memberId: manualMemberId,
       sessionId: data.session.id,
-      timeSlot: manualTimeSlot,
+      serviceTimeId: manualServiceTimeId,
     })
     setManualSubmitting(false)
     if (ok) {
@@ -186,31 +170,37 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📋</span>Attendance Dashboard</h1>
+            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📋</span>{data?.church.name ?? 'Attendance Dashboard'}</h1>
             <p className="text-sm text-slate-600">
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {' · '}
+              <Link href="/admin/choose" className="font-bold text-brand hover:underline">Switch church</Link>
             </p>
+            {data?.email && (
+              <p className="text-sm text-slate-600">
+                Signed in as <span className="font-bold text-slate-800">{data.email}</span>
+                {' · '}
+                {data.role === 'lead' ? 'Lead' : data.role === 'volunteer' ? 'Volunteer' : 'Network admin (view only)'}
+              </p>
+            )}
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="min-h-11 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60"
-          >
-            {isLoggingOut ? 'Logging out…' : 'Logout'}
-          </button>
+          <SignOutButton className="min-h-11 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60" />
         </div>
 
+        {data?.role === 'network' && (
+          <div role="status" className="rounded-2xl border-2 border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-bold text-yellow-800">
+            Network view: you can see this church&apos;s dashboard, but changes are made by its own leaders.
+          </div>
+        )}
+
         {/* Quick nav */}
-        <nav aria-label="Admin sections" className="flex gap-2">
-          <Link href="/admin/members" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Members
-          </Link>
-          <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Age Groups
-          </Link>
-          <Link href="/admin/sessions" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Past Sessions
-          </Link>
+        <nav aria-label="Admin sections" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Link href="/admin/members" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Members</Link>
+          <Link href="/admin/age-groups" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Age Groups</Link>
+          <Link href="/admin/service-times" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Service Times</Link>
+          <Link href="/admin/sessions" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Past Sessions</Link>
+          {data?.role === 'lead' && <Link href="/admin/team" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Team</Link>}
+          {data?.church && <Link href={`/${data.church.slug}`} className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Kiosk link</Link>}
         </nav>
 
         {/* Error state */}
@@ -293,7 +283,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                 ) : (
                   Object.entries(data.summary.byTimeSlot).map(([slot, count]) => (
                     <div key={slot} className="flex justify-between text-sm">
-                      <span className="text-slate-600">{slotLabel(slot)}</span>
+                      <span className="text-slate-600">{slot}</span>
                       <span className="font-black text-slate-800">{count}</span>
                     </div>
                   ))
@@ -380,12 +370,12 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                 <label htmlFor="manual-slot" className="block text-sm font-bold text-slate-700">Time slot</label>
                 <select
                   id="manual-slot"
-                  value={manualTimeSlot}
-                  onChange={e => setManualTimeSlot(e.target.value)}
+                  value={manualServiceTimeId}
+                  onChange={e => setManualServiceTimeId(e.target.value)}
                   className={inputClass}
                 >
-                  {TIME_SLOTS.map(ts => (
-                    <option key={ts.value} value={ts.value}>{ts.label}</option>
+                  {(data?.serviceTimes ?? []).map(ts => (
+                    <option key={ts.id} value={ts.id}>{ts.label}</option>
                   ))}
                 </select>
                 <button
@@ -476,7 +466,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                       </p>
                       <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
                         {row.ageGroup && <span>{row.ageGroup} · </span>}
-                        <span className="font-bold">{slotLabel(row.timeSlot)}</span>
+                        <span className="font-bold">{row.timeSlot ?? '—'}</span>
                         {' · In '}{formatTime(row.checkedInAt)}
                         {row.checkedOutAt && <span> · Out {formatTime(row.checkedOutAt)}</span>}
                       </p>
