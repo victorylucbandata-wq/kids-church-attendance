@@ -196,12 +196,18 @@ so it lives in tested app code instead. n8n still sends every email.
 3. Supabase, Authentication > Hooks > Send Email: HTTPS, URL `https://<production>/api/auth/send-email`, generate the secret, and copy it.
 4. Vercel, Settings > Environment Variables (Production and Preview): `SUPABASE_SECRET_KEY`, `SESSION_SECRET`, `N8N_MAILER_WEBHOOK_URL`, `N8N_MAILER_TOKEN` (copy from `.env.local`), and `SEND_EMAIL_HOOK_SECRET` (from step 3). Keep `ADMIN_PASSWORD` until after the first Sunday.
 
-**Deploy day (a weekday):**
-1. Merge the stage 1 PR; wait for the production deploy.
+**Deploy day (a weekday), about an hour. Only once most Lucban leaders have sent their emails:**
+1. Merge PR #5; wait for the production deploy. GitHub retargets PR #6 to `main` when the stage 1 branch is deleted.
 2. The network admin signs in at `/admin/login` (account and Lucban Lead membership were created 2026-09-27) and confirms the email arrives.
-3. Apply `supabase/migrations/20260927000002_multi_church_rls_cutover.sql` (dry run first), then run `supabase/tests/isolation.sql` with `apply_cutover=0`, plus the end-to-end script against production.
-4. Invite Lucban's other leaders from Team; they sign in before Sunday.
-5. Old kiosk QR codes land on the church picker; parents tap Lucban once.
+3. Backup, dry run, apply, verify (from the app folder, after `export $(grep ^SUPABASE_DB_URL= .env.local)`; `psql` is at `/opt/homebrew/opt/libpq/bin`):
+   - `pg_dump "$SUPABASE_DB_URL" --schema=public --format=custom -f ~/kids-church-attendance/backups/pre-cutover-$(date +%F).dump`
+   - Dry run: `(echo 'BEGIN;'; cat supabase/migrations/20260927000002_multi_church_rls_cutover.sql; echo 'ROLLBACK;') | psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1`
+   - Apply: `psql "$SUPABASE_DB_URL" -X -1 -v ON_ERROR_STOP=1 -f supabase/migrations/20260927000002_multi_church_rls_cutover.sql`
+   - `psql "$SUPABASE_DB_URL" -X -q -v apply_cutover=0 -f supabase/tests/isolation.sql`
+   - `node --env-file=.env.local scripts/e2e.mjs https://<production address>` (44 checks; throwaway church and users, removed after)
+4. Merge PR #6 (member import, privacy notice); re-run `scripts/e2e.mjs` against production.
+5. Invite Lucban's other leaders from Team; they sign in before Sunday.
+6. Old kiosk QR codes land on the church picker; parents tap Lucban once.
 
 **Rollback:** before step 3, revert the merge (old code and database still match). After step 3, revert the merge **and** run `supabase/rollback/20260927000002_down.sql`, which restores the pre-cutover policies, defaults and transition trigger (tested 2026-09-27: after it, the old app's check-in works again).
 
@@ -229,6 +235,7 @@ The source of truth for "where are we". Each entry records what changed since th
 | 2026-09-27 | **Stage 1 code complete on branch `stage1-multi-church` (not deployed).** Sign-in by emailed link, app-enforced session limits (`proxy.ts`), church picker, per-church scoping of every admin API/page, kiosk under `/[church]`, Service Times, Team, Network overview, Church column in exports. Cutover migration `...000002` written and isolation-tested (11 checks, all pass with it; fail as expected without it); **not applied**. Compat migration `...000003` (legacy `time_slot` optional) applied to production after a dry run as the live app. End-to-end run against a local production build with a throwaway church and users: 38/38 checks pass, all test data removed. Remaining before cutover: n8n Send Email workflow, Supabase Auth settings, Vercel env vars, first network admin and Lucban Lead invites. |
 | 2026-09-27 | Email path built and tested: `/api/auth/send-email` verifies signatures (6 unit tests; unsigned and forged requests rejected by the running app) and posts to the new, active n8n workflow "Kids Church Check-In mailer" (header token; requests without it get 403). The one live send failed inside n8n: the "Jansen Email" Gmail credential needs reconnecting. The app now only treats `{sent: true}` from n8n as success, because n8n replied 200 despite the failure. First network admin account created and made Lead of Victory Lucban. Cutover runbook added (5b). |
 | 2026-09-27 | **Pre-deploy checklist done** (runbook 5b): Gmail credential in n8n reconnected (test email sent, `{sent: true}`); Supabase Site URL, Redirect URLs, and Send Email hook (HTTPS, `/api/auth/send-email`) configured; five env vars added in Vercel. Two fixes found by trying it on the dev server: `/auth/confirm` now accepts `?code=` links (Supabase built-in email / SMTP fallback), and the dashboard shows who is signed in. PR #5 deliberately **not merged on Sunday**; merge on a weekday. Until then, sign-in emails cannot be sent (the hook points at a route the live site does not have yet), which the current Lucban app does not use. |
+| 2026-10-03 | **Stage 2 build (2.1, 2.2) done on branch `stage2-import`**, stacked on PR #5 and ahead of the stage 2 gate (pilot church and privacy answer still open, so no onboarding yet). Members → Import: download template (`public/member-template.csv`; opens in Google Sheets or Excel, so no separate Sheet), upload CSV, server-checked preview (missing name, bad date, bad role, unknown age group with closest-match hint), duplicate skip on church + first + last + birthday (blank birthday matches blank), then one insert for all good rows. Accepts our own attendance export too. Birthdays as YYYY-MM-DD or M/D/YYYY (Excel in PH). 7 unit tests; 9 end-to-end checks against the dev server with a throwaway church (signed-out and other-church requests refused, preview saves nothing, re-upload imports nothing), all test data removed. |
 
 ## 8. Open items needing follow-up
 
@@ -236,7 +243,7 @@ The source of truth for "where are we". Each entry records what changed since th
 |---|---|---|
 | 1 | n8n host, uptime, and whether it is reachable from Supabase over HTTPS | Network admin |
 | 2 | Personal Gmail daily sending limit (not documented on Google's Workspace limits page) | Network admin, if volume grows |
-| 3 | Data-sharing agreement or parent privacy notice under RA 10173 | Network leadership (stage 2 gate) |
+| 3 | Data-sharing agreement or parent privacy notice under RA 10173. **Partly done 2026-10-03:** First Timer form shows a privacy notice and requires a consent tick (server-enforced; a registration is the record of consent). Still needed: leadership review of the wording, a named contact for data requests, the church agreement, and notice for members registered before it. | Network leadership (stage 2 gate) |
 | 4 | Pilot church | Network leadership (stage 2 gate) |
 | 5 | Domain | Network admin (stage 3 gate) |
 | 6 | ~~`first_timers` shows 0 rows to the app.~~ **Resolved 2026-09-27:** 39 rows exist; the publishable key may insert but not read them, so dashboard, Past Sessions and export showed 0. Fixed by step 1.2 (admin reads as the signed-in user). | Done |
