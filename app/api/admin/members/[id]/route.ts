@@ -1,20 +1,18 @@
-import { isAdmin } from '@/app/lib/auth'
-import { createClient } from '@/app/lib/supabase/server'
+import { adminApi } from '@/app/lib/church'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function GET(_request: Request, { params }: Params) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi()
+  if (ctx instanceof Response) return ctx
 
   const { id } = await params
-  const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await ctx.db
     .from('members')
     .select('id, first_name, last_name, nickname, birthday, role, age_group_id, age_groups(name), parent_name, contact_number, notes, is_active')
     .eq('id', id)
+    .eq('church_id', ctx.church.id)
     .single()
 
   if (error) {
@@ -26,15 +24,13 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi({ write: true })
+  if (ctx instanceof Response) return ctx
 
   const { id } = await params
   const body = await request.json()
-  const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await ctx.db
     .from('members')
     .update({
       first_name: body.first_name,
@@ -50,6 +46,7 @@ export async function PUT(request: Request, { params }: Params) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('church_id', ctx.church.id)
 
   if (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 })
@@ -59,18 +56,17 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi({ write: true })
+  if (ctx instanceof Response) return ctx
 
   const { id } = await params
   const body = await request.json()
-  const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await ctx.db
     .from('members')
     .update({ is_active: body.is_active, updated_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('church_id', ctx.church.id)
 
   if (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 })

@@ -182,6 +182,29 @@ Invites use `supabase.auth.admin.inviteUserByEmail` (secret key, server-only) pl
 
 The work is onboarding only, with no planned build. Anything a church asks for goes through a new decision, not into this plan.
 
+## 5b. Stage 1 cutover runbook (added 2026-09-27)
+
+**Deviation from 4.1, decided during the build:** the Send Email hook points at the app
+(`/api/auth/send-email`), which verifies the Standard Webhooks signature and then posts the
+finished email to the n8n workflow "Kids Church Check-In mailer" (header-token webhook, then
+Gmail). Signature checking needs Node `crypto`, which self-hosted n8n Code nodes often block,
+so it lives in tested app code instead. n8n still sends every email.
+
+**Before deploy day (network admin):**
+1. n8n: reconnect the Gmail credential "Jansen Email" (its Google access had expired on 2026-09-27; this also affects other workflows that use it).
+2. Supabase, Authentication > URL Configuration: Site URL = the production address; add `https://<production>/auth/confirm` and `http://localhost:3000/auth/confirm` to Redirect URLs.
+3. Supabase, Authentication > Hooks > Send Email: HTTPS, URL `https://<production>/api/auth/send-email`, generate the secret, and copy it.
+4. Vercel, Settings > Environment Variables (Production and Preview): `SUPABASE_SECRET_KEY`, `SESSION_SECRET`, `N8N_MAILER_WEBHOOK_URL`, `N8N_MAILER_TOKEN` (copy from `.env.local`), and `SEND_EMAIL_HOOK_SECRET` (from step 3). Keep `ADMIN_PASSWORD` until after the first Sunday.
+
+**Deploy day (a weekday):**
+1. Merge the stage 1 PR; wait for the production deploy.
+2. The network admin signs in at `/admin/login` (account and Lucban Lead membership were created 2026-09-27) and confirms the email arrives.
+3. Apply `supabase/migrations/20260927000002_multi_church_rls_cutover.sql` (dry run first), then run `supabase/tests/isolation.sql` with `apply_cutover=0`, plus the end-to-end script against production.
+4. Invite Lucban's other leaders from Team; they sign in before Sunday.
+5. Old kiosk QR codes land on the church picker; parents tap Lucban once.
+
+**Rollback:** before step 3, revert the merge (old code and database still match). After step 3, revert the merge **and** run `supabase/rollback/20260927000002_down.sql`, which restores the pre-cutover policies, defaults and transition trigger (tested 2026-09-27: after it, the old app's check-in works again).
+
 ## 6. Isolation tests (required before any second church's data exists)
 
 Run against a Supabase branch or local stack with 2 seeded churches (A and B), a Lead and a Volunteer in each, and a network admin. Keep these as a script in `scripts/` (run with `node --test`), not manual clicks.
@@ -202,6 +225,10 @@ The source of truth for "where are we". Each entry records what changed since th
 | Date | Change since last entry |
 |---|---|
 | 2026-09-27 | Plan created. Decisions from the 2026-09-27 planning session recorded in the PRD, section 10. Nothing built. Production already has: Singapore function region, signed admin cookie, CSV export (PR #3). |
+| 2026-09-27 | **Stage 1 gate met; step 1.1 applied to production.** Gate: n8n API reachable over HTTPS (Hostinger VPS); database access via Session pooler `aws-1-ap-southeast-1` (confirms Singapore); backup of the whole `public` schema taken and row counts verified (`~/kids-church-attendance/backups/`, local only). Migration `supabase/migrations/20260927000001_multi_church_foundation.sql` dry-run in a rolled-back transaction, then applied: Victory Lucban created; 180 members, 298 attendance, 18 sessions, 39 first timers, 3 age groups backfilled; 3 service times created and all 298 check-ins linked. Deployed code smoke-tested against it with no errors. Transition defaults and trigger remain until cutover. |
+| 2026-09-27 | **Stage 1 code complete on branch `stage1-multi-church` (not deployed).** Sign-in by emailed link, app-enforced session limits (`proxy.ts`), church picker, per-church scoping of every admin API/page, kiosk under `/[church]`, Service Times, Team, Network overview, Church column in exports. Cutover migration `...000002` written and isolation-tested (11 checks, all pass with it; fail as expected without it); **not applied**. Compat migration `...000003` (legacy `time_slot` optional) applied to production after a dry run as the live app. End-to-end run against a local production build with a throwaway church and users: 38/38 checks pass, all test data removed. Remaining before cutover: n8n Send Email workflow, Supabase Auth settings, Vercel env vars, first network admin and Lucban Lead invites. |
+| 2026-09-27 | Email path built and tested: `/api/auth/send-email` verifies signatures (6 unit tests; unsigned and forged requests rejected by the running app) and posts to the new, active n8n workflow "Kids Church Check-In mailer" (header token; requests without it get 403). The one live send failed inside n8n: the "Jansen Email" Gmail credential needs reconnecting. The app now only treats `{sent: true}` from n8n as success, because n8n replied 200 despite the failure. First network admin account created and made Lead of Victory Lucban. Cutover runbook added (5b). |
+| 2026-09-27 | **Pre-deploy checklist done** (runbook 5b): Gmail credential in n8n reconnected (test email sent, `{sent: true}`); Supabase Site URL, Redirect URLs, and Send Email hook (HTTPS, `/api/auth/send-email`) configured; five env vars added in Vercel. Two fixes found by trying it on the dev server: `/auth/confirm` now accepts `?code=` links (Supabase built-in email / SMTP fallback), and the dashboard shows who is signed in. PR #5 deliberately **not merged on Sunday**; merge on a weekday. Until then, sign-in emails cannot be sent (the hook points at a route the live site does not have yet), which the current Lucban app does not use. |
 
 ## 8. Open items needing follow-up
 
@@ -212,5 +239,6 @@ The source of truth for "where are we". Each entry records what changed since th
 | 3 | Data-sharing agreement or parent privacy notice under RA 10173 | Network leadership (stage 2 gate) |
 | 4 | Pilot church | Network leadership (stage 2 gate) |
 | 5 | Domain | Network admin (stage 3 gate) |
-| 6 | `first_timers` shows 0 rows to the app. Confirm whether it is genuinely empty or hidden by an existing policy before migrating it. | Network admin, before step 1.1 |
-| 7 | Confirm the exact current RLS state and policies in the Supabase dashboard (the MCP account used on 2026-09-27 lacked access), so the migration starts from known policies rather than assumed ones | Network admin, before step 1.2 |
+| 6 | ~~`first_timers` shows 0 rows to the app.~~ **Resolved 2026-09-27:** 39 rows exist; the publishable key may insert but not read them, so dashboard, Past Sessions and export showed 0. Fixed by step 1.2 (admin reads as the signed-in user). | Done |
+| 7 | ~~Confirm current RLS state.~~ **Resolved 2026-09-27:** RLS is on for every table, but the `anon` role has SELECT/INSERT/UPDATE (and DELETE on `members`, `age_groups`) with `true` conditions; `authenticated` has ALL. Step 1.2 replaces these for the kids tables. | Done |
+| 8 | The database also holds a separate, live app's tables (`sfc_*`: 46 participants, 230 attendance, last used 2026-09-22) with the same open anon policies. Step 1.2 must not touch them, and isolation test 1 applies to the kids tables only. Consider moving that app to its own project, and tightening its policies, as separate work. | Network admin |

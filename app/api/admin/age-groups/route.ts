@@ -1,16 +1,13 @@
-import { isAdmin } from '@/app/lib/auth'
-import { createClient } from '@/app/lib/supabase/server'
+import { adminApi } from '@/app/lib/church'
 
 export async function GET() {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi()
+  if (ctx instanceof Response) return ctx
 
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
+  const { data, error } = await ctx.db
     .from('age_groups')
     .select('id, name, sort_order')
+    .eq('church_id', ctx.church.id)
     .order('sort_order')
 
   if (error) {
@@ -21,29 +18,27 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin())) {
-    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const ctx = await adminApi({ write: true })
+  if (ctx instanceof Response) return ctx
 
   const { name } = await request.json()
   if (!name?.trim()) {
     return Response.json({ success: false, error: 'Name is required.' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-
-  const { data: maxRow } = await supabase
+  const { data: maxRow } = await ctx.db
     .from('age_groups')
     .select('sort_order')
+    .eq('church_id', ctx.church.id)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   const nextOrder = (maxRow?.sort_order ?? 0) + 1
 
-  const { data, error } = await supabase
+  const { data, error } = await ctx.db
     .from('age_groups')
-    .insert({ name: name.trim(), sort_order: nextOrder })
+    .insert({ church_id: ctx.church.id, name: name.trim(), sort_order: nextOrder })
     .select('id')
     .single()
 
