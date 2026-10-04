@@ -13,6 +13,7 @@ type FirstTimerPayload = {
   serviceTimeId?: string
   birthday?: string
   notes?: string
+  consent?: boolean
 }
 
 const clip = (v: string | undefined, max = 200) => v?.trim().slice(0, max) || null
@@ -25,6 +26,10 @@ export async function POST(request: Request, { params }: Params) {
   const body = (await request.json().catch(() => ({}))) as FirstTimerPayload
   if (!body.parentName || !body.contactNumber || !body.childFirstName || !body.childLastName || !body.ageGroupId || !body.serviceTimeId) {
     return Response.json({ success: false, error: 'Missing required fields.' }, { status: 400 })
+  }
+  // Data Privacy Act consent from the form's privacy notice; a submitted registration is the record of it.
+  if (body.consent !== true) {
+    return Response.json({ success: false, error: 'Please tick the privacy notice box to continue.' }, { status: 400 })
   }
 
   const sessionId = await todaysSessionId(k)
