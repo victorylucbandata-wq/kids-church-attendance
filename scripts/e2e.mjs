@@ -70,6 +70,7 @@ try {
   await admin.from('network_admins').insert({ user_id: net.id })
   const { data: lucban } = await admin.from('churches').select('id').eq('slug', 'lucban').single()
   const { data: lucbanMember } = await admin.from('members').select('id').eq('church_id', lucban.id).limit(1).single()
+  const { data: lucbanSt } = await admin.from('service_times').select('id').eq('church_id', lucban.id).limit(1).single()
 
   // ---------- kiosk (no account) ----------
   let r = await call(null, 'GET', '/')
@@ -117,9 +118,25 @@ try {
   check('lead adds a member', r.json?.success === true, r.text.slice(0, 160))
   const memberId = r.json?.id
 
+  // ---------- Serve Team roster ----------
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+  r = await call(L.jar, 'POST', '/api/admin/members', { first_name: 'Vee', last_name: `E2E${tag}`, role: 'volunteer' })
+  const volunteerId = r.json?.id
+  r = await call(L.jar, 'POST', '/api/admin/roster', { date: today, serviceTimeId: st.id, memberId: volunteerId, serveRole: 'Teacher' })
+  check('lead puts a Serve Team member on the roster', r.json?.success === true, r.text.slice(0, 160))
+  r = await call(L.jar, 'POST', '/api/admin/roster', { date: today, serviceTimeId: st.id, memberId: volunteerId })
+  check('same person twice on one service is refused', r.status === 409, `${r.status}`)
+  r = await call(L.jar, 'POST', '/api/admin/roster', { date: today, serviceTimeId: st.id, memberId })
+  check('only Serve Team members can be rostered', r.status === 400, `${r.status}`)
+  r = await call(L.jar, 'POST', '/api/admin/roster', { date: today, serviceTimeId: lucbanSt.id, memberId: volunteerId })
+  check('roster cannot use another church\'s service time', r.status === 400, `${r.status}`)
+  r = await call(L.jar, 'GET', `/api/admin/roster?date=${today}`)
+  check('roster lists them with their role', r.json?.roster?.length === 1 && r.json.roster[0].serveRole === 'Teacher' && r.json.roles.includes('Teacher'), r.text.slice(0, 200))
+
   // ---------- kiosk flows for the test church ----------
   r = await call(null, 'GET', `/api/kiosk/${slug}/members`)
-  check('kiosk lists only this church\'s members', r.json?.members?.length === 1 && r.json.members[0].memberId === memberId, JSON.stringify(r.json)?.slice(0, 160))
+  check('kiosk lists only this church\'s members', r.json?.members?.length === 2 && r.json.members.every((m) => m.lastName === `E2E${tag}`), JSON.stringify(r.json)?.slice(0, 160))
+  check('kiosk gets today\'s roster per service', r.json?.roster?.[st.id]?.[volunteerId] === 'Teacher', JSON.stringify(r.json?.roster))
   r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: lucbanMember.id, serviceTimeId: st.id })
   check('kiosk rejects another church\'s member', r.status === 400, `${r.status} ${r.text.slice(0, 120)}`)
   r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId, serviceTimeId: st.id, notes: 'peanuts' })
@@ -132,16 +149,19 @@ try {
   check('first-timer registration needs privacy consent', r.status === 400 && /privacy/.test(r.json?.error ?? ''), `${r.status} ${r.text.slice(0, 120)}`)
   r = await call(null, 'POST', `/api/kiosk/${slug}/register`, { ...firstTimer, consent: true })
   check('kiosk first-timer registration works', r.json?.success === true, r.text.slice(0, 160))
+  r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: volunteerId, serviceTimeId: st.id })
+  check('rostered Serve Team member taps in at the kiosk', r.json?.success === true, r.text.slice(0, 160))
 
   r = await call(L.jar, 'GET', '/api/admin/data')
   const rows = r.json?.attendanceRows ?? []
-  check('dashboard sees 2 check-ins and 1 first timer', r.json?.summary?.checkedIn === 2 && r.json.summary.firstTimersToday === 1, JSON.stringify(r.json?.summary))
-  check('dashboard shows only this church\'s members', rows.length === 2 && rows.every((x) => x.lastName === `E2E${tag}`), `${rows.length} rows`)
+  check('dashboard counts 2 kids (not the Serve Team) and 1 first timer', r.json?.summary?.checkedIn === 2 && r.json.summary.firstTimersToday === 1 && r.json.summary.byRole?.volunteer === 1, JSON.stringify(r.json?.summary))
+  check('dashboard has today\'s roster', r.json?.roster?.length === 1 && r.json.roster[0].memberName.includes('Vee'), JSON.stringify(r.json?.roster))
+  check('dashboard shows only this church\'s members', rows.length === 3 && rows.every((x) => x.lastName === `E2E${tag}`), `${rows.length} rows`)
   check('dashboard labels the service time', rows.filter((x) => x.checkedIn).every((x) => x.timeSlot === '10:00 AM'))
 
   r = await call(L.jar, 'GET', '/api/admin/sessions/export')
   const lines = r.text.replace(/^﻿/, '').trim().split('\r\n')
-  check('export: Church column first, 2 rows, all this church', lines[0].startsWith('Church,Date') && lines.length === 3 && lines.slice(1).every((l) => l.startsWith(`E2E Test ${tag},`)), lines.slice(0, 2).join(' | '))
+  check('export: Church column first, 3 rows, all this church', lines[0].startsWith('Church,Date') && lines.length === 4 && lines.slice(1).every((l) => l.startsWith(`E2E Test ${tag},`)), lines.slice(0, 2).join(' | '))
   r = await call(L.jar, 'GET', '/api/admin/sessions/export?scope=network')
   check('lead cannot export the whole network', r.status === 403, `${r.status}`)
 
@@ -160,7 +180,7 @@ try {
   r = await call(L.jar, 'POST', '/api/admin/members/import', { csv, confirm: true })
   check('re-upload imports nothing new', r.json?.imported === 0, r.text.slice(0, 200))
   const { count: imported } = await admin.from('members').select('id', { count: 'exact', head: true }).eq('church_id', church.id)
-  check('test church now has 4 members', imported === 4, String(imported))
+  check('test church now has 5 members', imported === 5, String(imported))
 
   // ---------- team rules ----------
   r = await call(L.jar, 'GET', '/api/admin/team')
@@ -213,7 +233,7 @@ try {
 } finally {
   // ---------- cleanup: everything tagged with this run ----------
   if (made.churchId) {
-    for (const t of ['attendance', 'first_timers', 'members', 'sessions', 'age_groups', 'service_times', 'church_memberships']) {
+    for (const t of ['attendance', 'first_timers', 'roster', 'members', 'sessions', 'age_groups', 'service_times', 'church_memberships']) {
       const { error } = await admin.from(t).delete().eq('church_id', made.churchId)
       if (error) console.log('cleanup', t, error.message)
     }

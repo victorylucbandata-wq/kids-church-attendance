@@ -53,6 +53,7 @@ export default function ReturningPage() {
   const { church: slug } = useParams<{ church: string }>()
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [serviceTimes, setServiceTimes] = useState<ServiceTime[]>([])
+  const [roster, setRoster] = useState<Record<string, Record<string, string>>>({})
   const [step, setStep] = useState<Step>('time-slot')
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
@@ -72,6 +73,7 @@ export default function ReturningPage() {
           return
         }
         setServiceTimes(data.serviceTimes)
+        setRoster(data.roster ?? {})
         if (!data.sessionId) {
           setLoadState({ status: 'no-session', closed: data.closed })
           return
@@ -103,10 +105,14 @@ export default function ReturningPage() {
   const SERVE_TEAM = 'Serve Team'
   const groupOf = (m: { ageGroup: string }) => m.ageGroup || SERVE_TEAM
 
-  const membersInGroup =
+  // A service with a roster lists only its rostered Serve Team; without one, the whole Serve Team.
+  const onRoster = roster[selectedTimeSlot] && Object.keys(roster[selectedTimeSlot]).length ? roster[selectedTimeSlot] : null
+  const visibleMembers =
     loadState.status === 'ready'
-      ? loadState.members.filter((m) => groupOf(m) === selectedGroup)
+      ? loadState.members.filter((m) => m.role !== 'volunteer' || !onRoster || m.memberId in onRoster)
       : []
+
+  const membersInGroup = visibleMembers.filter((m) => groupOf(m) === selectedGroup)
 
   const sortedMembers = [...membersInGroup].sort((a, b) =>
     a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName)
@@ -121,12 +127,9 @@ export default function ReturningPage() {
   const totalPages = Math.ceil(filteredMembers.length / PAGE_SIZE)
   const pagedMembers = filteredMembers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  const activeGroups =
-    loadState.status === 'ready'
-      ? [...new Set(loadState.members.map(groupOf))].sort(
-          (a, b) => Number(a === SERVE_TEAM) - Number(b === SERVE_TEAM) || a.localeCompare(b)
-        )
-      : []
+  const activeGroups = [...new Set(visibleMembers.map(groupOf))].sort(
+    (a, b) => Number(a === SERVE_TEAM) - Number(b === SERVE_TEAM) || a.localeCompare(b)
+  )
 
   const GROUP_EMOJIS: Record<string, string> = {
     'Preschool': '🎨',
@@ -331,7 +334,7 @@ export default function ReturningPage() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {activeGroups.map((group) => {
-                const count = loadState.members.filter((m) => groupOf(m) === group).length
+                const count = visibleMembers.filter((m) => groupOf(m) === group).length
                 return (
                   <button
                     key={group}
@@ -397,6 +400,9 @@ export default function ReturningPage() {
                     <p className={`text-sm leading-tight ${isSelected ? 'text-brand' : 'text-slate-500'}`}>
                       {member.lastName}, {member.firstName}
                     </p>
+                    {onRoster?.[member.memberId] && (
+                      <p className={`text-xs font-bold mt-0.5 ${isSelected ? 'text-brand' : 'text-slate-600'}`}>{onRoster[member.memberId]}</p>
+                    )}
                     {member.birthday && (
                       <p className={`text-xs mt-0.5 text-yellow-800 ${bdayToday ? 'font-bold' : ''}`}>
                         {bdayToday ? 'Birthday today!' : 'Birthday this week!'}

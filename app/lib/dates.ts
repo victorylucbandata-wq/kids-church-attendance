@@ -12,3 +12,10 @@ export function manilaClock(now = new Date()): { sunday: boolean; minutes: numbe
   )
   return { sunday: p.weekday === 'Sun', minutes: Number(p.hour) * 60 + Number(p.minute) }
 }
+
+/** Today if it's Sunday in the Philippines, otherwise the coming Sunday (YYYY-MM-DD). */
+export function nextSundayInManila(): string {
+  const d = new Date(todayInManila() + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + ((7 - d.getUTCDay()) % 7))
+  return d.toISOString().slice(0, 10)
+}
