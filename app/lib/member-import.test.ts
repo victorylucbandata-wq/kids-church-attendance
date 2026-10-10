@@ -1,13 +1,13 @@
 // Run: node --test app/lib/member-import.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkImport, parseBirthday, parseCsv } from './member-import.ts'
+import { checkImport, parseBirthday, parseCsv, type ExistingMember } from './member-import.ts'
 import { asText, toCsv } from './csv.ts'
 
 const GROUPS = [{ id: 'g1', name: 'Toddlers' }, { id: 'g2', name: 'Big Kids' }]
 const HEADER = 'Last Name,First Name,Nickname,Birthday,Role,Age Group,Parent / Guardian,Contact Number,Notes'
 
-const rows = (csv: string, existing: { first_name: string; last_name: string; birthday: string | null }[] = []) => {
+const rows = (csv: string, existing: ExistingMember[] = []) => {
   const r = checkImport(csv, GROUPS, existing)
   if ('error' in r) throw new Error(r.error)
   return r.rows
@@ -67,4 +67,34 @@ test('round-trips our own export: phone text, Serve Team age group, extra column
 test('file-level errors', () => {
   assert.ok('error' in checkImport('', GROUPS, []))
   assert.ok('error' in checkImport('Name,Birthday\nMaria,2018-01-01', GROUPS, []))
+})
+
+test('an existing member gets only their blanks filled, never overwritten', () => {
+  const [r] = rows(`${HEADER}\nSantos,Maria,Mia,2018-03-25,,toddlers,Ana Santos,09179999999,`, [
+    { id: 'm1', first_name: 'Maria', last_name: 'Santos', birthday: null, contact_number: '09171234567', nickname: 'Mimi', age_group_id: null },
+  ])
+  assert.equal(r.status, 'update')
+  assert.deepEqual(r.update, {
+    id: 'm1',
+    fills: { birthday: '2018-03-25', age_group_id: 'g1', parent_name: 'Ana Santos' },
+    labels: ['birthday', 'age group', 'parent / guardian'],
+  })
+})
+
+test('matching: a blank birthday on either side still matches; different birthdays are different people', () => {
+  const existing = [{ id: 'm1', first_name: 'Ben', last_name: 'Reyes', birthday: '2017-01-02', parent_name: null }]
+  const [blankInFile] = rows(`${HEADER}\nReyes,Ben,,,,,Lito Reyes,,`, existing)
+  assert.equal(blankInFile.status, 'update')
+  assert.deepEqual(blankInFile.update?.fills, { parent_name: 'Lito Reyes' })
+  const [otherBen] = rows(`${HEADER}\nReyes,Ben,,2019-05-05,,,,,`, existing)
+  assert.equal(otherBen.status, 'ok')
+})
+
+test('matching: nothing new means skipped; two members with the name is a problem; a match listed twice is skipped', () => {
+  const one = [{ id: 'm1', first_name: 'Ben', last_name: 'Reyes', birthday: null, parent_name: 'Lito' }]
+  assert.equal(rows(`${HEADER}\nReyes,Ben,,,,,Someone Else,,`, one)[0].status, 'duplicate')
+  const two = [...one, { id: 'm2', first_name: 'Ben', last_name: 'Reyes', birthday: null }]
+  assert.equal(rows(`${HEADER}\nReyes,Ben,,,,,,0917,`, two)[0].status, 'error')
+  const twice = rows(`${HEADER}\nReyes,Ben,,,,,,0917,\nReyes,Ben,,,,,,0918,`, one)
+  assert.deepEqual(twice.map((x) => x.status), ['update', 'duplicate'])
 })

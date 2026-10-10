@@ -127,6 +127,10 @@ export default function MembersPage() {
             <p className="text-sm text-slate-600">{members.length} member{members.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex gap-2">
+            {/* Plain <a>: a file download, not a page navigation. */}
+            <a href="/api/admin/members/export" download className="flex min-h-11 items-center whitespace-nowrap rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
+              Export
+            </a>
             <Link href="/admin/members/import" className="flex min-h-11 items-center whitespace-nowrap rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
               Import
             </Link>
