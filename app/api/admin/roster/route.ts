@@ -11,12 +11,11 @@ export async function GET(request: Request) {
   const date = new URL(request.url).searchParams.get('date')
   if (!isDate(date)) return Response.json({ success: false, error: 'Pick a date.' }, { status: 400 })
 
-  const [serviceTimes, { data: volunteers }, { data: roster }, { data: pastRoles }, { data: session }] = await Promise.all([
+  const [serviceTimes, { data: volunteers }, { data: roster }, { data: session }] = await Promise.all([
     listServiceTimes(ctx.church.id),
     ctx.db.from('members').select('id, first_name, last_name, nickname')
       .eq('church_id', ctx.church.id).eq('role', 'volunteer').eq('is_active', true).order('last_name').order('first_name'),
     ctx.db.from('roster').select('id, service_time_id, member_id, serve_role').eq('church_id', ctx.church.id).eq('service_date', date),
-    ctx.db.from('roster').select('serve_role').eq('church_id', ctx.church.id).neq('serve_role', '').limit(500),
     ctx.db.from('sessions').select('id').eq('church_id', ctx.church.id).eq('session_date', date).maybeSingle(),
   ])
 
@@ -37,7 +36,6 @@ export async function GET(request: Request) {
       serveRole: r.serve_role,
       checkedInAt: arrivedAt.get(r.member_id) ?? null,
     })),
-    roles: [...new Set((pastRoles ?? []).map((r) => r.serve_role))].sort(),
   })
 }
 

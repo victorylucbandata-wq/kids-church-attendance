@@ -149,7 +149,7 @@ try {
   r = await call(L.jar, 'POST', '/api/admin/roster', { date: today, serviceTimeId: lucbanSt.id, memberId: volunteerId })
   check('roster cannot use another church\'s service time', r.status === 400, `${r.status}`)
   r = await call(L.jar, 'GET', `/api/admin/roster?date=${today}`)
-  check('roster lists them with their role', r.json?.roster?.length === 1 && r.json.roster[0].serveRole === 'Teacher' && r.json.roles.includes('Teacher'), r.text.slice(0, 200))
+  check('roster lists them with their role', r.json?.roster?.length === 1 && r.json.roster[0].serveRole === 'Teacher', r.text.slice(0, 200))
 
   // ---------- kiosk flows for the test church ----------
   r = await call(K, 'GET', `/api/kiosk/${slug}/members`)
