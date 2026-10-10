@@ -19,7 +19,8 @@ export type UncheckedMember = {
   nickname: string | null
   ageGroup: string
   role: Role
-  birthday: string | null
+  /** Whether a birthday is today or within the week; the kiosk never gets the date. */
+  birthday: 'today' | 'week' | null
 }
 
 export type AttendanceRow = {

@@ -46,7 +46,7 @@ type FirstTimerForm = {
 }
 
 type Option = { id: string; name: string }
-type Setup = { church: { name: string }; ageGroups: Option[]; serviceTimes: { id: string; label: string }[] }
+type Setup = { church: { name: string }; ageGroups: Option[]; serviceTimes: { id: string; label: string }[]; closed: string | null }
 
 const fetchSetup = (slug: string) => requestJson<Setup>(`/api/kiosk/${slug}/setup`)
 
@@ -81,6 +81,7 @@ export default function FirstTimerPage() {
   const [serviceTimes, setServiceTimes] = useState<Setup['serviceTimes']>([])
   const [ageGroupsFailed, setAgeGroupsFailed] = useState(false)
   const [churchName, setChurchName] = useState('')
+  const [closed, setClosed] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
   const [consentError, setConsentError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -97,6 +98,7 @@ export default function FirstTimerPage() {
       setChurchName(res.data.church.name)
       setAgeGroups(res.data.ageGroups)
       setServiceTimes(res.data.serviceTimes)
+      setClosed(res.data.closed)
     }
     setAgeGroupsFailed(!res.ok)
   }
@@ -108,6 +110,7 @@ export default function FirstTimerPage() {
         setChurchName(res.data.church.name)
         setAgeGroups(res.data.ageGroups)
         setServiceTimes(res.data.serviceTimes)
+        setClosed(res.data.closed)
       }
       setAgeGroupsFailed(!res.ok)
     })
@@ -150,7 +153,8 @@ export default function FirstTimerPage() {
     e.preventDefault()
     setMessage('')
 
-    const missing = REQUIRED_FIELDS.filter(([key]) => !form[key].trim())
+    // With one service open (always so on Sundays) the server picks it, so there is nothing to choose.
+    const missing = REQUIRED_FIELDS.filter(([key]) => !form[key].trim() && (key !== 'timeSlot' || serviceTimes.length > 1))
     if (missing.length > 0) {
       setErrors(Object.fromEntries(missing.map(([key, label]) => [key, `${label} is required.`])))
       setMessage(`Please fill in: ${missing.map(([, label]) => label).join(', ')}.`)
@@ -181,6 +185,7 @@ export default function FirstTimerPage() {
       }
 
       setCountdown(4)
+      setClosed(null)  // it went through, so check-in is open whatever the page loaded with
       setJustSubmitted(true)
     } catch (error) {
       setMessage(
@@ -225,7 +230,7 @@ export default function FirstTimerPage() {
     ['Birthday', form.birthday],
     ['Age', form.age],
     ['Group', ageGroups.find((g) => g.id === form.ageGroup)?.name ?? ''],
-    ['Time slot', serviceTimes.find((t) => t.id === form.timeSlot)?.label ?? ''],
+    ['Time slot', (serviceTimes.length === 1 ? serviceTimes[0] : serviceTimes.find((t) => t.id === form.timeSlot))?.label ?? ''],
     ['Notes', form.notes],
   ]
 
@@ -280,6 +285,11 @@ export default function FirstTimerPage() {
             </div>
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              {closed && (
+                <p role="status" className="rounded-2xl border-2 border-yellow-200 bg-yellow-50 p-3 text-center text-sm font-bold text-yellow-900">
+                  {closed}
+                </p>
+              )}
               <p className="text-sm text-slate-600">
                 Fields marked <span className="font-bold text-red-700">*</span> are required.
               </p>
@@ -351,16 +361,18 @@ export default function FirstTimerPage() {
                 )}
               </label>
 
-              <label className="block">
-                <span className={labelClass}>Time Slot{required}</span>
-                <select {...field('timeSlot')} required>
-                  <option value="">Select time slot</option>
-                  {serviceTimes.map((ts) => (
-                    <option key={ts.id} value={ts.id}>{ts.label}</option>
-                  ))}
-                </select>
-                {fieldError('timeSlot')}
-              </label>
+              {serviceTimes.length > 1 && (
+                <label className="block">
+                  <span className={labelClass}>Time Slot{required}</span>
+                  <select {...field('timeSlot')} required>
+                    <option value="">Select time slot</option>
+                    {serviceTimes.map((ts) => (
+                      <option key={ts.id} value={ts.id}>{ts.label}</option>
+                    ))}
+                  </select>
+                  {fieldError('timeSlot')}
+                </label>
+              )}
 
               <label className="block">
                 <span className={labelClass}>Allergies / Special Notes</span>

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { UncheckedMember } from '@/app/lib/types'
-import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
@@ -40,7 +39,7 @@ type Step = 'time-slot' | 'group-select' | 'member-select'
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'no-session' }
+  | { status: 'no-session'; closed: string | null }
   | { status: 'ready'; members: UncheckedMember[]; sessionId: string }
   | { status: 'all-done' }
   | { status: 'error'; message: string }
@@ -64,11 +63,7 @@ export default function ReturningPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
 
-  useEffect(() => {
-    fetch(`/api/kiosk/${slug}/setup`)
-      .then((r) => r.json())
-      .then((data) => { if (data.success) setServiceTimes(data.serviceTimes) })
-      .catch(() => {})  // the members request below reports network problems
+  const load = useCallback(() => {
     fetch(`/api/kiosk/${slug}/members`)
       .then((r) => r.json())
       .then((data) => {
@@ -76,9 +71,15 @@ export default function ReturningPage() {
           setLoadState({ status: 'error', message: data.error ?? 'Could not load members.' })
           return
         }
+        setServiceTimes(data.serviceTimes)
         if (!data.sessionId) {
-          setLoadState({ status: 'no-session' })
+          setLoadState({ status: 'no-session', closed: data.closed })
           return
+        }
+        // One service open (always so on Sundays): no need to ask which.
+        if (data.serviceTimes.length === 1) {
+          setSelectedTimeSlot(data.serviceTimes[0].id)
+          setStep((s) => (s === 'time-slot' ? 'group-select' : s))
         }
         if (data.members.length === 0) {
           setLoadState({ status: 'all-done' })
@@ -88,6 +89,15 @@ export default function ReturningPage() {
       })
       .catch(() => setLoadState({ status: 'error', message: 'Network error. Please try again.' }))
   }, [slug])
+
+  useEffect(load, [load])
+
+  // While check-in is shut, look again every minute so the kiosk opens on its own.
+  useEffect(() => {
+    if (loadState.status !== 'no-session') return
+    const id = setInterval(load, 60_000)
+    return () => clearInterval(id)
+  }, [loadState.status, load])
 
   const PAGE_SIZE = 10
   const SERVE_TEAM = 'Serve Team'
@@ -143,7 +153,7 @@ export default function ReturningPage() {
       setStep('group-select')
       setSelected(null)
       setNotes('')
-    } else if (step === 'group-select') {
+    } else if (step === 'group-select' && serviceTimes.length > 1) {
       setStep('time-slot')
     }
   }
@@ -181,6 +191,7 @@ export default function ReturningPage() {
 
       if (!data.success) {
         showToast(data.error ?? 'Check-in did not go through. Please try again.', false)
+        if (res.status === 409) load()  // closed, or already checked in: refresh what the kiosk shows
         return
       }
 
@@ -258,8 +269,8 @@ export default function ReturningPage() {
         {loadState.status === 'no-session' && (
           <div className="rounded-[2rem] border border-yellow-100 bg-white p-8 shadow-xl shadow-yellow-100/70 text-center space-y-3">
             <div aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100 text-3xl">⏳</div>
-            <p className="font-black text-slate-800">Check-in not open yet</p>
-            <p className="text-sm text-slate-500">Please ask a volunteer to start today&apos;s session.</p>
+            <p className="font-black text-slate-800">{loadState.closed ?? 'Check-in not open yet'}</p>
+            {!loadState.closed && <p className="text-sm text-slate-500">Please ask a volunteer to start today&apos;s session.</p>}
           </div>
         )}
 
@@ -363,11 +374,8 @@ export default function ReturningPage() {
             <div className="space-y-2">
               {pagedMembers.map((member) => {
                 const isSelected = selected?.memberId === member.memberId
-                const bdayToday = isBirthdayToday(member.birthday)
-                const bdayWeek = !bdayToday && isBirthdayThisWeek(member.birthday)
-                const bday = member.birthday
-                  ? new Date(member.birthday + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : null
+                const bdayToday = member.birthday === 'today'
+                const bdayWeek = member.birthday === 'week'
                 return (
                   <button
                     key={member.memberId}
@@ -389,9 +397,9 @@ export default function ReturningPage() {
                     <p className={`text-sm leading-tight ${isSelected ? 'text-brand' : 'text-slate-500'}`}>
                       {member.lastName}, {member.firstName}
                     </p>
-                    {bday && (
-                      <p className={`text-xs mt-0.5 ${bdayToday ? 'font-bold text-yellow-800' : bdayWeek ? 'text-yellow-800' : 'text-slate-500'}`}>
-                        {bdayToday ? 'Birthday today!' : bdayWeek ? 'Birthday this week!' : bday}
+                    {member.birthday && (
+                      <p className={`text-xs mt-0.5 text-yellow-800 ${bdayToday ? 'font-bold' : ''}`}>
+                        {bdayToday ? 'Birthday today!' : 'Birthday this week!'}
                       </p>
                     )}
                   </button>
@@ -427,7 +435,7 @@ export default function ReturningPage() {
         )}
 
         <div className="mt-4 text-center">
-          {(step === 'member-select' || step === 'group-select') && (
+          {(step === 'member-select' || (step === 'group-select' && serviceTimes.length > 1)) && (
             <button
               onClick={handleBack}
               className="block w-full py-3 text-sm font-bold text-brand hover:underline"

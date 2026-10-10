@@ -1,4 +1,4 @@
-import { kioskFor, todaysSessionId } from '@/app/lib/kiosk'
+import { checkInState, kioskFor, serviceTimeFor } from '@/app/lib/kiosk'
 
 type Params = { params: Promise<{ church: string }> }
 
@@ -12,20 +12,20 @@ export async function POST(request: Request, { params }: Params) {
     serviceTimeId?: string
     notes?: string
   }
-  if (!memberId || !serviceTimeId) {
-    return Response.json({ success: false, error: 'Choose a service time and a name.' }, { status: 400 })
+  const state = await checkInState(k)
+  if (!state.sessionId) {
+    return Response.json({ success: false, error: state.closed ?? 'Check-in is not open yet. Please ask a volunteer.' }, { status: 409 })
   }
-
-  const sessionId = await todaysSessionId(k)
-  if (!sessionId) {
-    return Response.json({ success: false, error: 'Check-in is not open yet. Please ask a volunteer.' }, { status: 409 })
+  const serviceTime = serviceTimeFor(state, serviceTimeId)
+  if (!memberId || !serviceTime) {
+    return Response.json({ success: false, error: 'Choose a service time and a name.' }, { status: 400 })
   }
 
   const { error } = await k.db.from('attendance').insert({
     church_id: k.church.id,
-    session_id: sessionId,
+    session_id: state.sessionId,
     member_id: memberId,
-    service_time_id: serviceTimeId,
+    service_time_id: serviceTime,
     checked_in: true,
     checked_in_at: new Date().toISOString(),
     notes: notes?.slice(0, 1000) || null,

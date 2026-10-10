@@ -1,4 +1,4 @@
-import { kioskFor, todaysSessionId } from '@/app/lib/kiosk'
+import { checkInState, kioskFor, serviceTimeFor } from '@/app/lib/kiosk'
 
 type Params = { params: Promise<{ church: string }> }
 
@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: Params) {
   if (k instanceof Response) return k
 
   const body = (await request.json().catch(() => ({}))) as FirstTimerPayload
-  if (!body.parentName || !body.contactNumber || !body.childFirstName || !body.childLastName || !body.ageGroupId || !body.serviceTimeId) {
+  if (!body.parentName || !body.contactNumber || !body.childFirstName || !body.childLastName || !body.ageGroupId) {
     return Response.json({ success: false, error: 'Missing required fields.' }, { status: 400 })
   }
   // Data Privacy Act consent from the form's privacy notice; a submitted registration is the record of it.
@@ -32,10 +32,13 @@ export async function POST(request: Request, { params }: Params) {
     return Response.json({ success: false, error: 'Please tick the privacy notice box to continue.' }, { status: 400 })
   }
 
-  const sessionId = await todaysSessionId(k)
+  const state = await checkInState(k)
+  const sessionId = state.sessionId
   if (!sessionId) {
-    return Response.json({ success: false, error: 'Check-in is not open yet. Ask a volunteer to start today\'s session.' }, { status: 409 })
+    return Response.json({ success: false, error: state.closed ?? 'Check-in is not open yet. Ask a volunteer to start today\'s session.' }, { status: 409 })
   }
+  const serviceTime = serviceTimeFor(state, body.serviceTimeId)
+  if (!serviceTime) return Response.json({ success: false, error: 'Please choose a time slot.' }, { status: 400 })
 
   // The age group must belong to this church.
   const { data: ageGroup } = await k.db
@@ -66,7 +69,7 @@ export async function POST(request: Request, { params }: Params) {
     church_id: k.church.id,
     session_id: sessionId,
     member_id: member.id,
-    service_time_id: body.serviceTimeId,
+    service_time_id: serviceTime,
     checked_in: true,
     checked_in_at: new Date().toISOString(),
     notes: clip(body.notes, 1000),

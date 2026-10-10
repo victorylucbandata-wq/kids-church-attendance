@@ -7,12 +7,18 @@ import Decor from '@/app/components/Decor'
 import Notice from '@/app/components/Notice'
 import { inputClass } from '@/app/lib/ui'
 import { requestJson } from '@/app/lib/api'
+import { CLOSES_AFTER, OPENS_BEFORE, formatMinutes, startMinutes } from '@/app/lib/service-clock'
 
 const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🕘',
     title: 'Service times',
     body: 'These are the times parents choose from when they check in, like 9:00 AM or Special Event. Each church sets its own.',
+  },
+  {
+    emoji: '⏰',
+    title: 'Sundays open by themselves',
+    body: 'On Sundays, a time named like 9:00 AM opens check-in 30 minutes before and closes it 90 minutes after, with no need to tap Start. A time without a clock time, like Special Event, opens when a lead taps Start Session, as do all times on other days.',
   },
   {
     emoji: '↕️',
@@ -29,6 +35,14 @@ const HELP_STEPS: HelpStep[] = [
 type ServiceTime = { id: string; label: string; sort_order: number; is_active: boolean }
 
 const fetchTimes = () => requestJson<{ serviceTimes: ServiceTime[] }>('/api/admin/service-times')
+
+// What the Sunday clock does with this time, so a lead can see it understood the name.
+function clockNote(label: string): string {
+  const start = startMinutes(label)
+  return start === null
+    ? 'Opens when a lead taps Start Session'
+    : `Sundays: opens ${formatMinutes(start - OPENS_BEFORE)}, closes ${formatMinutes(start + CLOSES_AFTER)}`
+}
 
 const smallButton = 'min-h-11 min-w-11 rounded-lg px-2 text-base text-slate-600 hover:bg-blue-50 disabled:opacity-20'
 
@@ -170,7 +184,10 @@ export default function ServiceTimesPage() {
                 </>
               ) : (
                 <>
-                  <span className="flex-1 text-sm font-black text-slate-800">{t.label}</span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-black text-slate-800">{t.label}</span>
+                    <span className="block text-xs text-slate-600">{clockNote(t.label)}</span>
+                  </span>
                   <div className="flex gap-1">
                     <button onClick={() => move(i, -1)} disabled={i === 0 || busy} aria-label={`Move ${t.label} up`} className={smallButton}>↑</button>
                     <button onClick={() => move(i, 1)} disabled={i === active.length - 1 || busy} aria-label={`Move ${t.label} down`} className={smallButton}>↓</button>
