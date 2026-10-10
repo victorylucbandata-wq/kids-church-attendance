@@ -46,7 +46,7 @@ type FirstTimerForm = {
 }
 
 type Option = { id: string; name: string }
-type Setup = { ageGroups: Option[]; serviceTimes: { id: string; label: string }[] }
+type Setup = { church: { name: string }; ageGroups: Option[]; serviceTimes: { id: string; label: string }[] }
 
 const fetchSetup = (slug: string) => requestJson<Setup>(`/api/kiosk/${slug}/setup`)
 
@@ -80,6 +80,9 @@ export default function FirstTimerPage() {
   const [ageGroups, setAgeGroups] = useState<Option[]>([])
   const [serviceTimes, setServiceTimes] = useState<Setup['serviceTimes']>([])
   const [ageGroupsFailed, setAgeGroupsFailed] = useState(false)
+  const [churchName, setChurchName] = useState('')
+  const [consent, setConsent] = useState(false)
+  const [consentError, setConsentError] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)
   const [message, setMessage] = useState('')
@@ -91,6 +94,7 @@ export default function FirstTimerPage() {
   // A failed load would leave the required Age Group empty, so offer a retry instead.
   const applySetup = (res: Awaited<ReturnType<typeof fetchSetup>>) => {
     if (res.ok) {
+      setChurchName(res.data.church.name)
       setAgeGroups(res.data.ageGroups)
       setServiceTimes(res.data.serviceTimes)
     }
@@ -101,6 +105,7 @@ export default function FirstTimerPage() {
   useEffect(() => {
     fetchSetup(slug).then((res) => {
       if (res.ok) {
+        setChurchName(res.data.church.name)
         setAgeGroups(res.data.ageGroups)
         setServiceTimes(res.data.serviceTimes)
       }
@@ -125,6 +130,7 @@ export default function FirstTimerPage() {
     resetTimerRef.current = setTimeout(() => {
       clearInterval(countdownRef.current!)
       setForm(initialForm)
+      setConsent(false)
       setJustSubmitted(false)
       setMessage('')
     }, 4000)
@@ -151,6 +157,12 @@ export default function FirstTimerPage() {
       document.getElementById(missing[0][0])?.focus()
       return
     }
+    if (!consent) {
+      setConsentError(true)
+      setMessage('Please read the privacy notice and tick the box to continue.')
+      document.getElementById('consent')?.focus()
+      return
+    }
 
     try {
       setIsSubmitting(true)
@@ -159,7 +171,7 @@ export default function FirstTimerPage() {
       const res = await fetch(`/api/kiosk/${slug}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...rest, ageGroupId: ageGroup, serviceTimeId: timeSlot }),
+        body: JSON.stringify({ ...rest, ageGroupId: ageGroup, serviceTimeId: timeSlot, consent }),
       })
 
       const result = await res.json()
@@ -354,6 +366,28 @@ export default function FirstTimerPage() {
                 <span className={labelClass}>Allergies / Special Notes</span>
                 <textarea {...field('notes')} rows={3} placeholder="e.g. Allergic to peanuts" />
               </label>
+
+              {/* Data Privacy Act (RA 10173): tell parents what we collect and why, and get their consent. */}
+              <div className="rounded-2xl border-2 border-blue-100 bg-blue-50/60 p-4 text-sm leading-relaxed text-slate-700">
+                <p className="font-black text-slate-900">Privacy notice</p>
+                <p className="mt-1">
+                  {churchName || 'Our church'}{' '}keeps your child&apos;s details, your name and contact number, and any notes
+                  (including allergies) only to check your child in and keep them safe during service. Only our Kids Church
+                  leaders can see them, and they are not shared outside the church. To see, correct or delete your
+                  details, talk to any Kids Church leader.
+                </p>
+                <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 font-bold text-slate-900">
+                  <input
+                    id="consent"
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => { setConsent(e.target.checked); setConsentError(false) }}
+                    aria-invalid={consentError || undefined}
+                    className="mt-0.5 h-6 w-6 shrink-0 accent-brand"
+                  />
+                  <span>I am the parent or guardian, and I agree to this use of my child&apos;s information.{required}</span>
+                </label>
+              </div>
 
               {message && (
                 <p role="alert" className="rounded-2xl border-2 border-red-100 bg-red-50 p-3 text-sm font-bold text-red-800">

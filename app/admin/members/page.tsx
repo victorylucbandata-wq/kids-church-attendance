@@ -129,6 +129,9 @@ export default function MembersPage() {
           <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
             Age Groups
           </Link>
+          <Link href="/admin/members/import" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
+            Import
+          </Link>
         </div>
 
         <div className="flex items-center justify-between">
