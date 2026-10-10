@@ -30,3 +30,11 @@ export function serviceAt<T extends { label: string }>(times: T[], now: number):
   const next = timed.find((x) => x.start - OPENS_BEFORE > now)
   return { open: open?.t ?? null, opensAt: open || !next ? null : next.start - OPENS_BEFORE }
 }
+
+/** The timed services whose check-in window has already closed at `now`. */
+export function closedBy<T extends { label: string }>(times: T[], now: number): T[] {
+  return times.filter((t) => {
+    const start = startMinutes(t.label)
+    return start !== null && now >= start + CLOSES_AFTER
+  })
+}

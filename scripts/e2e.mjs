@@ -182,6 +182,21 @@ try {
   const { count: imported } = await admin.from('members').select('id', { count: 'exact', head: true }).eq('church_id', church.id)
   check('test church now has 5 members', imported === 5, String(imported))
 
+  // ---------- pick-ups, per service ----------
+  const { data: st2 } = await admin.from('service_times').insert({ church_id: church.id, label: 'Special Event', sort_order: 2 }).select('id').single()
+  const { data: cara } = await admin.from('members').select('id').eq('church_id', church.id).eq('first_name', 'Cara').single()
+  r = await call(L.jar, 'GET', '/api/admin/data')
+  r = await call(L.jar, 'POST', '/api/admin/attendance', { memberId: cara.id, sessionId: r.json.session.id, serviceTimeId: st2.id })
+  check('manual check-in to a second service', r.json?.success === true, r.text.slice(0, 160))
+  r = await call(L.jar, 'GET', '/api/admin/data')
+  const sessionId = r.json.session.id
+  check('dashboard says which services have closed', Array.isArray(r.json.closedServiceIds), JSON.stringify(r.json.closedServiceIds))
+  r = await call(L.jar, 'PATCH', '/api/admin/attendance', { bulkCheckoutAll: true, sessionId, serviceTimeId: st.id })
+  check('mark all picked up for one service', r.json?.success === true, r.text.slice(0, 160))
+  r = await call(L.jar, 'GET', '/api/admin/data')
+  const still = (r.json?.attendanceRows ?? []).filter((x) => x.checkedIn && !x.checkedOutAt)
+  check('only that service\'s kids were picked up', still.length === 1 && still[0].memberId === cara.id && r.json.summary.stillHere === 1, JSON.stringify(still.map((x) => x.firstName)))
+
   // ---------- team rules ----------
   r = await call(L.jar, 'GET', '/api/admin/team')
   check('lead sees team of 2', r.json?.team?.length === 2, r.text.slice(0, 160))
@@ -215,7 +230,7 @@ try {
   check('lead is sent away from /network', r.status === 307, `${r.status}`)
   r = await call(N.jar, 'POST', '/api/admin/church', { churchId: church.id })
   r = await call(N.jar, 'GET', '/api/admin/data')
-  check('network admin views church read-only', r.json?.role === 'network' && r.json.summary.checkedIn === 2, JSON.stringify(r.json)?.slice(0, 120))
+  check('network admin views church read-only', r.json?.role === 'network' && r.json.summary.checkedIn === 3, JSON.stringify(r.json)?.slice(0, 120))
   r = await call(N.jar, 'POST', '/api/admin/members', { first_name: 'X', last_name: 'Y' })
   check('network view blocks writes', r.status === 403, `${r.status}`)
   r = await call(N.jar, 'POST', '/api/admin/members/import', { csv })

@@ -34,7 +34,7 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '👋',
     title: 'Checking kids out',
-    body: 'Tap "Check Out" next to a child\'s name when their parent picks them up. Use "Check Out All" at the end of service to mark everyone as picked up.',
+    body: 'Tap "Check Out" next to a child\'s name when their parent picks them up. On Sundays, when a service closes, an orange box lists its kids not marked picked up: check each has gone home, then tap "Mark all picked up".',
   },
   {
     emoji: '🎂',
@@ -67,7 +67,9 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
   const [checkingOutId, setCheckingOutId] = useState<string | null>(null)
   const [bulkCheckingOut, setBulkCheckingOut] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'here' | 'out'>('all')
+  // Still Here first: during and after service the question is who hasn't been picked up yet.
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'here' | 'out'>('here')
+  const [pickingUpService, setPickingUpService] = useState<string | null>(null)
 
   const sessionExists = !!data?.session
 
@@ -158,6 +160,14 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
     setBulkCheckingOut(false)
   }
 
+  const handleServicePickup = async (serviceTimeId: string, label: string, count: number) => {
+    if (!data?.session) return
+    if (!confirm(`Mark all ${count} kids from ${label} as picked up?`)) return
+    setPickingUpService(serviceTimeId)
+    await sendAttendance('PATCH', { bulkCheckoutAll: true, sessionId: data.session.id, serviceTimeId })
+    setPickingUpService(null)
+  }
+
   const formatTime = (ts: string | null) => {
     if (!ts) return '—'
     const d = new Date(ts)
@@ -191,6 +201,29 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
             Network view: you can see this church&apos;s dashboard, but changes are made by its own leaders.
           </div>
         )}
+
+        {/* Services that have closed with kids not marked picked up */}
+        {data?.session && data.serviceTimes.filter(st => data.closedServiceIds.includes(st.id)).map(st => {
+          const waiting = data.attendanceRows.filter(r => r.role === 'child' && r.checkedIn && !r.checkedOutAt && r.serviceTimeId === st.id)
+          if (waiting.length === 0) return null
+          return (
+            <div key={st.id} role="alert" className="rounded-2xl border-2 border-orange-200 bg-orange-50 p-4">
+              <p className="font-black text-orange-900">
+                <span aria-hidden="true" className="mr-1.5">⚠️</span>
+                {st.label} has closed: {waiting.length} kid{waiting.length !== 1 ? 's' : ''} not marked picked up
+              </p>
+              <p className="mt-1 text-sm text-orange-900">{waiting.map(r => r.memberName).join(', ')}</p>
+              <p className="mt-1 text-sm text-orange-900">Check each child has gone home with their parent, then mark them picked up.</p>
+              <button
+                onClick={() => handleServicePickup(st.id, st.label, waiting.length)}
+                disabled={pickingUpService === st.id}
+                className="mt-3 min-h-11 rounded-xl border-2 border-orange-200 bg-white px-4 py-2 text-sm font-black text-orange-800 hover:bg-orange-100 disabled:opacity-60"
+              >
+                {pickingUpService === st.id ? 'Saving…' : `Mark all ${waiting.length} picked up`}
+              </button>
+            </div>
+          )
+        })}
 
         {/* Error state */}
         {actionError && (

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   return Response.json({ success: true })
 }
 
-// Check-out (one child, or everyone still here), and service-time corrections.
+// Check-out (one child, or everyone still here, optionally only from one service), and service-time corrections.
 export async function PATCH(request: Request) {
   const ctx = await adminApi({ write: true })
   if (ctx instanceof Response) return ctx
@@ -46,13 +46,15 @@ export async function PATCH(request: Request) {
   const now = new Date().toISOString()
 
   if (bulkCheckoutAll && sessionId) {
-    const { error } = await ctx.db
+    let query = ctx.db
       .from('attendance')
       .update({ checked_out_at: now, checked_out_by: ctx.userId })
       .eq('church_id', ctx.church.id)
       .eq('session_id', sessionId)
       .eq('checked_in', true)
       .is('checked_out_at', null)
+    if (serviceTimeId) query = query.eq('service_time_id', serviceTimeId)
+    const { error } = await query
 
     if (error) {
       return Response.json({ success: false, error: error.message }, { status: 500 })
