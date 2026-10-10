@@ -17,16 +17,17 @@ GRANT SELECT ON t TO anon, authenticated;
 INSERT INTO t VALUES
   ('church_a', gen_random_uuid()), ('church_b', gen_random_uuid()),
   ('lead_a', gen_random_uuid()), ('vol_a', gen_random_uuid()), ('lead_b', gen_random_uuid()),
-  ('net', gen_random_uuid()), ('stranger', gen_random_uuid());
+  ('net', gen_random_uuid()), ('stranger', gen_random_uuid()), ('staff_a', gen_random_uuid());
 
 INSERT INTO auth.users (id, email, aud, role)
-SELECT id, k || '@isolation.test', 'authenticated', 'authenticated' FROM t WHERE k IN ('lead_a','vol_a','lead_b','net','stranger');
+SELECT id, k || '@isolation.test', 'authenticated', 'authenticated' FROM t WHERE k IN ('lead_a','vol_a','lead_b','net','stranger','staff_a');
 
 INSERT INTO churches (id, name, slug) SELECT id, k, replace(k, '_', '-') || '-iso' FROM t WHERE k LIKE 'church_%';
 INSERT INTO church_memberships (church_id, user_id, role) VALUES
   ((SELECT id FROM t WHERE k='church_a'), (SELECT id FROM t WHERE k='lead_a'), 'lead'),
   ((SELECT id FROM t WHERE k='church_a'), (SELECT id FROM t WHERE k='vol_a'),  'volunteer'),
-  ((SELECT id FROM t WHERE k='church_b'), (SELECT id FROM t WHERE k='lead_b'), 'lead');
+  ((SELECT id FROM t WHERE k='church_b'), (SELECT id FROM t WHERE k='lead_b'), 'lead'),
+  ((SELECT id FROM t WHERE k='church_a'), (SELECT id FROM t WHERE k='staff_a'), 'staff');
 INSERT INTO network_admins VALUES ((SELECT id FROM t WHERE k='net'));
 
 DO $$
@@ -175,6 +176,17 @@ DO $$ BEGIN
   RAISE EXCEPTION 'FAIL 6b: cross-church age group accepted';
 EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS 6b';
 END $$;
+
+\echo '6c. Staff (headcount only) see no kids records, even in their own church'
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.as_user('staff_a');
+DO $$ DECLARE tbl TEXT; BEGIN
+  FOREACH tbl IN ARRAY ARRAY['members','attendance','first_timers','sessions','roster'] LOOP
+    IF pg_temp.visible(tbl, (SELECT id FROM t WHERE k='church_a')) > 0 THEN RAISE EXCEPTION 'FAIL 6c: staff see %', tbl; END IF;
+  END LOOP;
+  RAISE NOTICE 'PASS 6c';
+END $$;
+RESET ROLE;
 
 \echo '7. existing Lucban data untouched by the tests'
 SELECT count(*) AS lucban_members FROM members WHERE church_id = (SELECT id FROM churches WHERE slug = 'lucban');

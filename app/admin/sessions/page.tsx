@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireAdminPage, type AdminContext } from '@/app/lib/church'
 import { listServiceTimes } from '@/app/lib/service-times'
 import Decor from '@/app/components/Decor'
@@ -93,6 +94,9 @@ export default async function SessionsPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link href="/admin/headcount" className="inline-flex min-h-11 items-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
+            📊 Headcount report
+          </Link>
           {sessions.length > 0 && (
             // Plain <a>: this is a file download, not a page navigation.
             <a

@@ -9,21 +9,25 @@ const TABS = [
   { href: '/admin', emoji: '📋', label: 'Today', match: (p: string) => p === '/admin' },
   { href: '/admin/roster', emoji: '🙌', label: 'Roster', match: (p: string) => p.startsWith('/admin/roster') },
   { href: '/admin/members', emoji: '👥', label: 'Members', match: (p: string) => p.startsWith('/admin/members') },
-  { href: '/admin/sessions', emoji: '📅', label: 'History', match: (p: string) => p.startsWith('/admin/sessions') },
+  { href: '/admin/sessions', emoji: '📅', label: 'History', match: (p: string) => p.startsWith('/admin/sessions') || p.startsWith('/admin/headcount') },
   {
     href: '/admin/settings',
     emoji: '⚙️',
     label: 'Settings',
-    match: (p: string) => ['/admin/settings', '/admin/age-groups', '/admin/service-times', '/admin/team', '/admin/choose'].some((s) => p.startsWith(s)),
+    match: (p: string) => ['/admin/settings', '/admin/age-groups', '/admin/service-times', '/admin/team', '/admin/kiosk', '/admin/choose'].some((s) => p.startsWith(s)),
   },
 ]
 
-const ROLE_LABEL = { lead: 'Lead', volunteer: 'Volunteer', network: 'Network admin (view only)' }
+// Staff see headcounts only, so they get just that one tab.
+const STAFF_TABS = [{ href: '/admin/headcount', emoji: '📊', label: 'Headcount', match: () => true }]
+
+const ROLE_LABEL = { lead: 'Lead', volunteer: 'Volunteer', staff: 'Staff (headcount only)', network: 'Network admin (view only)' }
 
 type Props = { churchName: string; email: string; role: keyof typeof ROLE_LABEL }
 
 export default function AdminNav({ churchName, email, role }: Props) {
   const pathname = usePathname()
+  const tabs = role === 'staff' ? STAFF_TABS : TABS
   return (
     <header className="bg-blue-50 px-4 pt-4">
       <div className="mx-auto max-w-2xl space-y-3">
@@ -37,8 +41,8 @@ export default function AdminNav({ churchName, email, role }: Props) {
           <SignOutButton className="min-h-11 shrink-0 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60" />
         </div>
 
-        <nav aria-label="Admin sections" className="grid grid-cols-5 gap-1.5">
-          {TABS.map((t) => {
+        <nav aria-label="Admin sections" className={`grid gap-1.5 ${role === 'staff' ? 'grid-cols-1' : 'grid-cols-5'}`}>
+          {tabs.map((t) => {
             const active = t.match(pathname)
             return (
               <Link

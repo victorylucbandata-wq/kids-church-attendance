@@ -16,6 +16,9 @@ const activeTab = (html) => {
   return a.slice(a.indexOf('>') + 1).split('</a>')[0].replace(/<[^>]*>|[^A-Za-z]/g, '')
 }
 
+// What a page shows on screen (Next.js also streams page data inside <script> tags).
+const shown = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '')
+
 let passed = 0, failed = 0
 const check = (name, ok, extra = '') => { ok ? passed++ : failed++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra && !ok ? `  -> ${extra}` : ''}`) }
 
@@ -62,11 +65,16 @@ try {
     if (error) throw error
     made.users.push(data.user.id); return data.user
   }
-  const lead = await mk('lead'), vol = await mk('vol'), net = await mk('net')
+  const lead = await mk('lead'), vol = await mk('vol'), net = await mk('net'), staff = await mk('staff')
   await admin.from('church_memberships').insert([
     { church_id: church.id, user_id: lead.id, role: 'lead' },
     { church_id: church.id, user_id: vol.id, role: 'volunteer' },
+    { church_id: church.id, user_id: staff.id, role: 'staff' },
   ])
+  // The test church's check-in device: the cookie a Lead's "Use this device" would set.
+  const { data: keyRow } = await admin.from('churches').select('kiosk_key').eq('id', church.id).single()
+  const K = new Jar()
+  K.c.set('kiosk_device', `${church.id}.${keyRow.kiosk_key}`)
   await admin.from('network_admins').insert({ user_id: net.id })
   const { data: lucban } = await admin.from('churches').select('id').eq('slug', 'lucban').single()
   const { data: lucbanMember } = await admin.from('members').select('id').eq('church_id', lucban.id).limit(1).single()
@@ -76,16 +84,26 @@ try {
   let r = await call(null, 'GET', '/')
   check('home page lists churches', r.status === 200 && r.text.includes('Victory Lucban') && r.text.includes(`E2E Test ${tag}`), `status ${r.status}`)
   r = await call(null, 'GET', '/lucban')
-  check('/lucban kiosk renders', r.status === 200 && r.text.includes('Victory Lucban'), `status ${r.status}`)
+  check('/lucban on an unknown device shows the locked screen', r.status === 200 && r.text.includes('Victory Lucban') && shown(r.text).includes('Check in at the kiosk') && !shown(r.text).includes('Returning Member'), `status ${r.status}`)
+  r = await call(null, 'GET', `/${slug}/check-in/returning`)
+  check('check-in pages are locked too on an unknown device', r.status === 200 && r.text.includes('Check in at the kiosk'), `status ${r.status}`)
+  r = await call(K, 'GET', `/${slug}`)
+  check('the church\'s own device gets the kiosk', r.status === 200 && shown(r.text).includes('Returning Member') && !shown(r.text).includes('Check in at the kiosk'), `status ${r.status}`)
   r = await call(null, 'GET', '/no-such-church')
   check('unknown church is 404', r.status === 404, `status ${r.status}`)
   r = await call(null, 'GET', '/check-in/returning')
   check('old kiosk URL redirects to picker', [307, 308].includes(r.status) && r.location.endsWith('/'), `${r.status} ${r.location}`)
-  r = await call(null, 'GET', '/api/kiosk/lucban/setup')
-  check('Lucban setup: 3 service times', r.json?.success && r.json.serviceTimes.length === 3 && r.json.ageGroups.length >= 1, JSON.stringify(r.json)?.slice(0, 120))
-  r = await call(null, 'GET', `/api/kiosk/${slug}/setup`)
+  r = await call(null, 'GET', '/api/kiosk/lucban/members')
+  check('kiosk API refuses an unknown device (no kids list)', r.status === 403 && r.json?.locked === true && !r.json.members, JSON.stringify(r.json)?.slice(0, 120))
+  const wrongKey = new Jar()
+  wrongKey.c.set('kiosk_device', `${church.id}.00000000-0000-0000-0000-000000000000`)
+  r = await call(wrongKey, 'GET', `/api/kiosk/${slug}/members`)
+  check('kiosk API refuses a wrong device key', r.status === 403)
+  r = await call(K, 'GET', '/api/kiosk/lucban/members')
+  check('one church\'s device cannot open another church\'s kiosk', r.status === 403)
+  r = await call(K, 'GET', `/api/kiosk/${slug}/setup`)
   check('test church setup is its own', r.json?.serviceTimes?.length === 1 && r.json.serviceTimes[0].label === '10:00 AM', JSON.stringify(r.json)?.slice(0, 120))
-  r = await call(null, 'GET', `/api/kiosk/${slug}/members`)
+  r = await call(K, 'GET', `/api/kiosk/${slug}/members`)
   check('kiosk before session: not open', r.json?.success && r.json.sessionId === null)
 
   // ---------- admin without sign-in ----------
@@ -134,22 +152,22 @@ try {
   check('roster lists them with their role', r.json?.roster?.length === 1 && r.json.roster[0].serveRole === 'Teacher' && r.json.roles.includes('Teacher'), r.text.slice(0, 200))
 
   // ---------- kiosk flows for the test church ----------
-  r = await call(null, 'GET', `/api/kiosk/${slug}/members`)
+  r = await call(K, 'GET', `/api/kiosk/${slug}/members`)
   check('kiosk lists only this church\'s members', r.json?.members?.length === 2 && r.json.members.every((m) => m.lastName === `E2E${tag}`), JSON.stringify(r.json)?.slice(0, 160))
   check('kiosk gets today\'s roster per service', r.json?.roster?.[st.id]?.[volunteerId] === 'Teacher', JSON.stringify(r.json?.roster))
-  r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: lucbanMember.id, serviceTimeId: st.id })
+  r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: lucbanMember.id, serviceTimeId: st.id })
   check('kiosk rejects another church\'s member', r.status === 400, `${r.status} ${r.text.slice(0, 120)}`)
-  r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId, serviceTimeId: st.id, notes: 'peanuts' })
+  r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId, serviceTimeId: st.id, notes: 'peanuts' })
   check('kiosk returning check-in works', r.json?.success === true, r.text.slice(0, 160))
   const firstTimer = {
     parentName: 'E2E Parent', contactNumber: '09170000000', childFirstName: 'Ben', childLastName: `E2E${tag}`,
     ageGroupId: ag.id, serviceTimeId: st.id,
   }
-  r = await call(null, 'POST', `/api/kiosk/${slug}/register`, firstTimer)
+  r = await call(K, 'POST', `/api/kiosk/${slug}/register`, firstTimer)
   check('first-timer registration needs privacy consent', r.status === 400 && /privacy/.test(r.json?.error ?? ''), `${r.status} ${r.text.slice(0, 120)}`)
-  r = await call(null, 'POST', `/api/kiosk/${slug}/register`, { ...firstTimer, consent: true })
+  r = await call(K, 'POST', `/api/kiosk/${slug}/register`, { ...firstTimer, consent: true })
   check('kiosk first-timer registration works', r.json?.success === true, r.text.slice(0, 160))
-  r = await call(null, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: volunteerId, serviceTimeId: st.id })
+  r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: volunteerId, serviceTimeId: st.id })
   check('rostered Serve Team member taps in at the kiosk', r.json?.success === true, r.text.slice(0, 160))
 
   r = await call(L.jar, 'GET', '/api/admin/data')
@@ -199,7 +217,7 @@ try {
 
   // ---------- team rules ----------
   r = await call(L.jar, 'GET', '/api/admin/team')
-  check('lead sees team of 2', r.json?.team?.length === 2, r.text.slice(0, 160))
+  check('lead sees team of 3 (Lead, Volunteer, Staff in that order)', r.json?.team?.map((m) => m.role).join() === 'lead,volunteer,staff', r.text.slice(0, 160))
   r = await call(L.jar, 'PATCH', '/api/admin/team', { userId: lead.id, role: 'volunteer' })
   check('only Lead cannot demote themselves', r.status === 409, `${r.status}`)
   const V = await signIn(vol.email)
@@ -209,6 +227,43 @@ try {
   check('volunteer can run the dashboard', r.json?.success === true)
   r = await call(V.jar, 'GET', '/admin/settings')
   check('volunteer does not see Team in Settings', r.status === 200 && r.text.includes('href="/admin/age-groups"') && !r.text.includes('href="/admin/team"'))
+  // ---------- check-in devices ----------
+  r = await call(V.jar, 'POST', '/api/admin/kiosk-device', { action: 'enable' })
+  check('a Volunteer cannot switch devices on', r.status === 403, `${r.status}`)
+  r = await call(L.jar, 'POST', '/api/admin/kiosk-device', { action: 'enable' })
+  check('a Lead switches this device on', r.json?.success === true && L.jar.c.get('kiosk_device') === K.c.get('kiosk_device'), r.text.slice(0, 120))
+  r = await call(L.jar, 'GET', '/api/admin/kiosk-device')
+  check('device status says switched on', r.json?.thisDevice === true && r.json.canManage === true, r.text.slice(0, 120))
+  r = await call(L.jar, 'POST', '/api/admin/kiosk-device', { action: 'reset' })
+  check('Switch off all devices', r.json?.success === true, r.text.slice(0, 120))
+  r = await call(K, 'GET', `/api/kiosk/${slug}/members`)
+  check('a switched-off device loses the kiosk', r.status === 403, `${r.status}`)
+  r = await call(L.jar, 'GET', '/api/admin/kiosk-device')
+  check('the Lead\'s own device is off too', r.json?.thisDevice === false, r.text.slice(0, 120))
+
+  // ---------- Staff: headcount only ----------
+  const S = await signIn(staff.email)
+  r = await call(S.jar, 'GET', '/admin')
+  check('Staff land on the headcount report', r.status === 307 && r.location.endsWith('/admin/headcount'), `${r.status} ${r.location}`)
+  for (const path of ['/api/admin/data', '/api/admin/members', `/api/admin/roster?date=${today}`, '/api/admin/sessions/export']) {
+    r = await call(S.jar, 'GET', path)
+    check(`Staff are refused ${path.split('?')[0]}`, r.status === 403, `${r.status}`)
+  }
+  r = await call(S.jar, 'GET', '/api/admin/headcount')
+  const todayRow = r.json?.rows?.find((x) => x.date === today)
+  check('Staff see headcount numbers (kids, first timers, Serve Team)', todayRow?.kids === 3 && todayRow.serveTeam === 1 && todayRow.firstTimers === 1, JSON.stringify(todayRow))
+  check('the headcount carries no names', r.status === 200 && !r.text.includes(`E2E${tag}`))
+  r = await call(S.jar, 'GET', '/admin/headcount')
+  check('Staff get only the Headcount tab', r.status === 200 && activeTab(r.text) === 'Headcount' && !r.text.includes('href="/admin/members"'), `${r.status} active=${activeTab(r.text)}`)
+  r = await call(S.jar, 'GET', '/api/admin/headcount?format=csv')
+  check('headcount CSV download', r.status === 200 && r.text.includes('Kids,First timers,Serve Team'), r.text.slice(0, 80))
+  r = await call(L.jar, 'GET', '/admin/headcount')
+  check('Leads find the headcount under History', r.status === 200 && activeTab(r.text) === 'History', `active=${activeTab(r.text)}`)
+  r = await call(L.jar, 'PATCH', '/api/admin/team', { userId: vol.id, role: 'staff' })
+  check('a Lead can make someone Staff', r.json?.success === true, r.text.slice(0, 120))
+  r = await call(V.jar, 'GET', '/api/admin/data')
+  check('...and they lose the dashboard at once', r.status === 403, `${r.status}`)
+
   r = await call(L.jar, 'DELETE', '/api/admin/team', { userId: vol.id })
   check('lead removes volunteer', r.json?.success === true, r.text.slice(0, 120))
   r = await call(V.jar, 'GET', '/api/admin/data')

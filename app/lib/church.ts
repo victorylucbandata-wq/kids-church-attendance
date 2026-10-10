@@ -5,7 +5,7 @@ import { createClient } from '@/app/lib/supabase/server'
 import { createAdminClient } from '@/app/lib/supabase/admin'
 import { CHURCH_COOKIE } from '@/app/lib/cookie-names'
 
-export type Role = 'lead' | 'volunteer' | 'network'
+export type Role = 'lead' | 'volunteer' | 'staff' | 'network'
 
 export type Church = { id: string; name: string; slug: string; is_active: boolean }
 
@@ -33,7 +33,7 @@ export async function listAccess(userId: string) {
     admin.from('network_admins').select('user_id').eq('user_id', userId).maybeSingle(),
   ])
   const churches = (memberships ?? [])
-    .map((m) => ({ role: m.role as 'lead' | 'volunteer', church: m.churches as unknown as Church }))
+    .map((m) => ({ role: m.role as 'lead' | 'volunteer' | 'staff', church: m.churches as unknown as Church }))
     .filter((m) => m.church?.is_active)
     .sort((a, b) => a.church.name.localeCompare(b.church.name))
   return { churches, isNetworkAdmin: !!net }
@@ -68,11 +68,15 @@ const resolve = cache(async (): Promise<Resolved> => {
   return { status: 'ok', ctx: { db, userId: user.id, email: user.email ?? '', church, role, isNetworkAdmin } }
 })
 
-/** For server components under /admin: redirects when signed out or no church is picked. */
-export async function requireAdminPage(): Promise<AdminContext> {
+/**
+ * For server components under /admin: redirects when signed out or no church is picked.
+ * Staff only get the headcount report, so every other page sends them there.
+ */
+export async function requireAdminPage(opts: { staff?: boolean } = {}): Promise<AdminContext> {
   const r = await resolve()
   if (r.status === 'signed-out') redirect('/admin/login')
   if (r.status === 'choose-church') redirect('/admin/choose')
+  if (r.ctx.role === 'staff' && !opts.staff) redirect('/admin/headcount')
   return r.ctx
 }
 
@@ -84,9 +88,10 @@ export async function getAdminContext(): Promise<AdminContext | null> {
 
 /**
  * For /api/admin route handlers. Returns the context, or a Response to send back.
- * `write` blocks the network admin's read-only view; `lead` requires a church Lead.
+ * `write` blocks the network admin's read-only view; `lead` requires a church Lead;
+ * Staff are turned away unless `staff` says the route is the headcount report.
  */
-export async function adminApi(opts: { write?: boolean; lead?: boolean } = {}): Promise<AdminContext | Response> {
+export async function adminApi(opts: { write?: boolean; lead?: boolean; staff?: boolean } = {}): Promise<AdminContext | Response> {
   const r = await resolve()
   if (r.status === 'signed-out') {
     return Response.json({ success: false, error: 'Please sign in again.' }, { status: 401 })
@@ -95,6 +100,9 @@ export async function adminApi(opts: { write?: boolean; lead?: boolean } = {}): 
     return Response.json({ success: false, error: 'Choose a church first.' }, { status: 409 })
   }
   const { ctx } = r
+  if (ctx.role === 'staff' && !opts.staff) {
+    return Response.json({ success: false, error: 'Staff accounts can see the headcount report only.' }, { status: 403 })
+  }
   if ((opts.write || opts.lead) && ctx.role === 'network') {
     return Response.json({ success: false, error: 'Network view is read-only.' }, { status: 403 })
   }

@@ -1,4 +1,7 @@
+import { cookies } from 'next/headers'
 import { churchBySlug, type Church } from '@/app/lib/church'
+import { KIOSK_COOKIE } from '@/app/lib/cookie-names'
+import { safeEqual } from '@/app/lib/session-token'
 import { createAdminClient } from '@/app/lib/supabase/admin'
 import { manilaClock, todayInManila } from '@/app/lib/dates'
 import { listServiceTimes } from '@/app/lib/service-times'
@@ -6,12 +9,27 @@ import { formatMinutes, serviceAt, startMinutes } from '@/app/lib/service-clock'
 
 export type Kiosk = { church: Church; db: ReturnType<typeof createAdminClient> }
 
-// Parents have no account, so kiosk routes use the secret key. Every query they make
-// must be filtered by kiosk.church.id; the attendance trigger backs this up in the database.
+/** True when this browser is one of the church's own check-in devices (a Lead switched it on). */
+export async function isKioskDevice(churchId: string): Promise<boolean> {
+  const value = (await cookies()).get(KIOSK_COOKIE)?.value
+  if (!value) return false
+  const { data } = await createAdminClient().from('churches').select('kiosk_key').eq('id', churchId).maybeSingle()
+  return !!data && safeEqual(value, `${churchId}.${data.kiosk_key}`)
+}
+
+// Parents have no account, so kiosk routes use the secret key. They only answer the church's
+// own check-in devices, and every query must be filtered by kiosk.church.id (the attendance
+// trigger backs this up in the database).
 export async function kioskFor(params: Promise<{ church: string }>): Promise<Kiosk | Response> {
   const { church: slug } = await params
   const church = await churchBySlug(slug)
   if (!church) return Response.json({ success: false, error: 'Church not found.' }, { status: 404 })
+  if (!(await isKioskDevice(church.id))) {
+    return Response.json(
+      { success: false, locked: true, error: `Check-in only works on ${church.name}'s check-in device. Please ask a volunteer.` },
+      { status: 403 }
+    )
+  }
   return { church, db: createAdminClient() }
 }
 
