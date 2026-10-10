@@ -8,6 +8,7 @@ import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
 import { requestJson } from '@/app/lib/api'
 import { inputClass } from '@/app/lib/ui'
+import { byServeRole } from '@/app/lib/serve-roles'
 import Decor from '@/app/components/Decor'
 
 const HELP_STEPS: HelpStep[] = [
@@ -29,7 +30,7 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '📊',
     title: 'Watch the numbers',
-    body: 'The summary cards show Checked In, Still Here, and Checked Out for kids. The Serve Team card shows who is rostered for each service and who has tapped in. Use the filter tabs (All / Still Here / Out) to see who\'s still in the building.',
+    body: 'The summary cards show Checked In, Still Here, and Checked Out for kids. The Serve Team card shows who is rostered for each service: tap Check in when each person arrives. Use the filter tabs (All / Still Here / Out) to see who\'s still in the building.',
   },
   {
     emoji: '👋',
@@ -70,6 +71,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
   // Still Here first: during and after service the question is who hasn't been picked up yet.
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'here' | 'out'>('here')
   const [pickingUpService, setPickingUpService] = useState<string | null>(null)
+  const [servingId, setServingId] = useState<string | null>(null)
 
   const sessionExists = !!data?.session
 
@@ -158,6 +160,14 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
     setBulkCheckingOut(true)
     await sendAttendance('PATCH', { bulkCheckoutAll: true, sessionId: data.session.id })
     setBulkCheckingOut(false)
+  }
+
+  // The team lead checks the Serve Team in (they don't tap in at the kiosk).
+  const handleServeCheckIn = async (memberId: string, serviceTimeId: string) => {
+    if (!data?.session) return
+    setServingId(memberId)
+    await sendAttendance('POST', { memberId, sessionId: data.session.id, serviceTimeId })
+    setServingId(null)
   }
 
   const handleServicePickup = async (serviceTimeId: string, label: string, count: number) => {
@@ -360,7 +370,7 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           </>
         )}
 
-        {/* Serve Team: today's roster per service, and who has tapped in */}
+        {/* Serve Team: today's roster per service; the team lead checks each person in here */}
         {(() => {
           if (!data) return null
           const volunteerIn = new Map(data.attendanceRows.filter(r => r.role === 'volunteer' && r.checkedIn).map(r => [r.memberId, r]))
@@ -376,12 +386,12 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                 </Link>
               </div>
               {services.length === 0 && extra.length === 0 && (
-                <p className="text-sm text-slate-600">No roster for today, and nobody from the Serve Team has tapped in yet.</p>
+                <p className="text-sm text-slate-600">No roster for today. Check in anyone serving with Manual Check-In below.</p>
               )}
               {services.map(st => (
                 <div key={st.id} className="mb-3">
                   <p className="mb-1 text-sm font-bold text-slate-700">{st.label}</p>
-                  {data.roster.filter(e => e.serviceTimeId === st.id).map(e => {
+                  {data.roster.filter(e => e.serviceTimeId === st.id).sort(byServeRole).map(e => {
                     const inAt = volunteerIn.get(e.memberId)?.checkedInAt ?? null
                     return (
                       <div key={e.memberId} className="flex items-center justify-between gap-3 py-1 text-sm">
@@ -389,9 +399,20 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                           <span className="font-bold">{e.memberName}</span>
                           {e.serveRole && <span className="text-slate-600"> · {e.serveRole}</span>}
                         </span>
-                        {inAt
-                          ? <span className="shrink-0 font-bold text-green-700 tabular-nums">✓ In {formatTime(inAt)}</span>
-                          : <span className="shrink-0 font-bold text-orange-800">Not yet</span>}
+                        {inAt ? (
+                          <span className="shrink-0 font-bold text-green-700 tabular-nums">✓ In {formatTime(inAt)}</span>
+                        ) : data.session && data.role !== 'network' ? (
+                          <button
+                            onClick={() => handleServeCheckIn(e.memberId, e.serviceTimeId)}
+                            disabled={servingId === e.memberId}
+                            aria-label={`Check in ${e.memberName}`}
+                            className="min-h-11 shrink-0 rounded-xl border-2 border-blue-100 px-3 py-1.5 text-sm font-black text-brand hover:bg-blue-50 disabled:opacity-60"
+                          >
+                            {servingId === e.memberId ? 'Saving…' : 'Check in'}
+                          </button>
+                        ) : (
+                          <span className="shrink-0 font-bold text-orange-800">Not yet</span>
+                        )}
                       </div>
                     )
                   })}

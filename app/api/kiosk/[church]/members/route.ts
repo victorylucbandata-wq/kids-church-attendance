@@ -4,7 +4,8 @@ import { todayInManila } from '@/app/lib/dates'
 
 type Params = { params: Promise<{ church: string }> }
 
-// Active members of this church not yet checked in today, plus whether check-in is open.
+// Active kids of this church not yet checked in today, plus whether check-in is open.
+// The Serve Team is checked in by the team lead on the Today tab, not at the kiosk.
 export async function GET(_request: Request, { params }: Params) {
   const k = await kioskFor(params)
   if (k instanceof Response) return k
@@ -13,19 +14,15 @@ export async function GET(_request: Request, { params }: Params) {
     const { sessionId, serviceTimes, closed } = await checkInState(k)
     if (!sessionId) return Response.json({ success: true, sessionId: null, members: [], serviceTimes, closed })
 
-    const [{ data: checkedIn }, { data: activeMembers }, { data: rosterRows }] = await Promise.all([
+    const [{ data: checkedIn }, { data: activeMembers }] = await Promise.all([
       k.db.from('attendance').select('member_id').eq('church_id', k.church.id).eq('session_id', sessionId),
       k.db
         .from('members')
         .select('id, first_name, last_name, nickname, role, birthday, age_groups(name)')
         .eq('church_id', k.church.id)
+        .eq('role', 'child')
         .eq('is_active', true),
-      k.db.from('roster').select('service_time_id, member_id, serve_role').eq('church_id', k.church.id).eq('service_date', todayInManila()),
     ])
-
-    // Per service: who is rostered to serve, and as what. The kiosk lists only them under Serve Team.
-    const roster: Record<string, Record<string, string>> = {}
-    for (const r of rosterRows ?? []) (roster[r.service_time_id] ??= {})[r.member_id] = r.serve_role
 
     // This list is public, so it says whose birthday is near but never the date itself.
     const today = new Date(todayInManila() + 'T00:00:00')
@@ -42,7 +39,7 @@ export async function GET(_request: Request, { params }: Params) {
         birthday: isBirthdayToday(m.birthday, today) ? 'today' : isBirthdayThisWeek(m.birthday, today) ? 'week' : null,
       }))
 
-    return Response.json({ success: true, sessionId, members, serviceTimes, closed, roster })
+    return Response.json({ success: true, sessionId, members, serviceTimes, closed })
   } catch {
     return Response.json({ success: false, error: 'Could not load today\'s list.' }, { status: 500 })
   }

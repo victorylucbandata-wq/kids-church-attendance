@@ -8,22 +8,23 @@ import Notice from '@/app/components/Notice'
 import { inputClass } from '@/app/lib/ui'
 import { requestJson } from '@/app/lib/api'
 import { nextSundayInManila } from '@/app/lib/dates'
+import { SERVE_ROLES, byServeRole } from '@/app/lib/serve-roles'
 
 const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🙌',
     title: 'Plan who serves',
-    body: 'Pick the Sunday, then add Serve Team members to each service with their role, like Teacher or Registration. Each service has its own list.',
+    body: 'Pick the Sunday, then add Serve Team members to each service with their role, like Registration or Games. Each service has its own list.',
   },
   {
     emoji: '👆',
-    title: 'Tapping in',
-    body: 'On the day, people on the roster find their name under Serve Team on the kiosk and tap in. If a service has no roster, everyone on the Serve Team is listed, as before.',
+    title: 'Checking in',
+    body: 'On the day, the team lead checks each person in from the Serve Team card on the Today tab. The kiosk is for kids only.',
   },
   {
     emoji: '✅',
     title: 'Who has arrived',
-    body: 'On the day itself, a tick and the time show next to everyone who has tapped in. The Today tab shows the same.',
+    body: 'On the day itself, a tick and the time show next to everyone who has been checked in. The Today tab shows the same.',
   },
 ]
 
@@ -36,6 +37,10 @@ type RosterData = {
 }
 
 const fetchRoster = (date: string) => requestJson<RosterData>(`/api/admin/roster?date=${date}`)
+
+// Phones show a date field in their own format; leaders read dates as mm/dd/yyyy.
+const mdy = (d: string) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`
+const weekday = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long' })
 
 const time = (ts: string) => new Date(ts).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
 
@@ -82,7 +87,19 @@ export default function RosterPage() {
 
         <label className="card block p-4">
           <span className="mb-1.5 block text-sm font-bold text-slate-700">Sunday</span>
-          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className={inputClass} />
+          {/* The native picker opens on tap; its own text is hidden under the mm/dd/yyyy label. */}
+          <span className="relative block">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
+              className={`${inputClass.replace('text-slate-800', 'text-transparent')} cursor-pointer`}
+            />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-base text-slate-900">
+              {mdy(date)} · {weekday(date)}
+            </span>
+          </span>
         </label>
 
         {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
@@ -99,11 +116,11 @@ export default function RosterPage() {
         )}
 
         <datalist id="serve-roles">
-          {data?.roles.map((r) => <option key={r} value={r} />)}
+          {[...SERVE_ROLES, ...(data?.roles ?? []).filter((r) => !SERVE_ROLES.includes(r))].map((r) => <option key={r} value={r} />)}
         </datalist>
 
         {data && data.volunteers.length > 0 && data.serviceTimes.map((st) => {
-          const entries = data.roster.filter((r) => r.serviceTimeId === st.id)
+          const entries = data.roster.filter((r) => r.serviceTimeId === st.id).sort(byServeRole)
           const onIt = new Set(entries.map((e) => e.memberId))
           const pick = picks[st.id] ?? { memberId: '', serveRole: '' }
           const setPick = (p: Partial<typeof pick>) => setPicks((all) => ({ ...all, [st.id]: { ...pick, ...p } }))
@@ -114,7 +131,7 @@ export default function RosterPage() {
                 <span className="ml-2 text-sm font-bold text-slate-600">{entries.length} serving</span>
               </h2>
 
-              {entries.length === 0 && <p className="text-sm text-slate-600">Nobody yet. The kiosk will list the whole Serve Team for this service.</p>}
+              {entries.length === 0 && <p className="text-sm text-slate-600">Nobody yet.</p>}
               {entries.map((e) => (
                 <div key={e.id} className="flex items-center gap-2 rounded-2xl border-2 border-blue-50 bg-white px-3 py-2">
                   <span className="min-w-0 flex-1">
@@ -153,7 +170,7 @@ export default function RosterPage() {
                     list="serve-roles"
                     value={pick.serveRole}
                     onChange={(e) => setPick({ serveRole: e.target.value })}
-                    placeholder="Role, e.g. Teacher"
+                    placeholder="Role, e.g. Games"
                     maxLength={40}
                     className={inputClass}
                   />

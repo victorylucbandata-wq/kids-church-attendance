@@ -12,7 +12,7 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🎨',
     title: 'Step 1 — Pick the age group',
-    body: 'Tap your child\'s age group — or Serve Team if you are volunteering. Only groups with people still to check in are shown.',
+    body: 'Tap your child\'s age group. Only groups with kids still to check in are shown. Serving today? The team lead checks you in.',
   },
   {
     emoji: '🙋',
@@ -53,7 +53,6 @@ export default function ReturningPage() {
   const { church: slug } = useParams<{ church: string }>()
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [serviceTimes, setServiceTimes] = useState<ServiceTime[]>([])
-  const [roster, setRoster] = useState<Record<string, Record<string, string>>>({})
   const [step, setStep] = useState<Step>('time-slot')
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
@@ -73,7 +72,6 @@ export default function ReturningPage() {
           return
         }
         setServiceTimes(data.serviceTimes)
-        setRoster(data.roster ?? {})
         if (!data.sessionId) {
           setLoadState({ status: 'no-session', closed: data.closed })
           return
@@ -102,15 +100,9 @@ export default function ReturningPage() {
   }, [loadState.status, load])
 
   const PAGE_SIZE = 10
-  const SERVE_TEAM = 'Serve Team'
-  const groupOf = (m: { ageGroup: string }) => m.ageGroup || SERVE_TEAM
-
-  // A service with a roster lists only its rostered Serve Team; without one, the whole Serve Team.
-  const onRoster = roster[selectedTimeSlot] && Object.keys(roster[selectedTimeSlot]).length ? roster[selectedTimeSlot] : null
-  const visibleMembers =
-    loadState.status === 'ready'
-      ? loadState.members.filter((m) => m.role !== 'volunteer' || !onRoster || m.memberId in onRoster)
-      : []
+  const NO_GROUP = 'No age group'
+  const groupOf = (m: { ageGroup: string }) => m.ageGroup || NO_GROUP
+  const visibleMembers = loadState.status === 'ready' ? loadState.members : []
 
   const membersInGroup = visibleMembers.filter((m) => groupOf(m) === selectedGroup)
 
@@ -128,13 +120,12 @@ export default function ReturningPage() {
   const pagedMembers = filteredMembers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const activeGroups = [...new Set(visibleMembers.map(groupOf))].sort(
-    (a, b) => Number(a === SERVE_TEAM) - Number(b === SERVE_TEAM) || a.localeCompare(b)
+    (a, b) => Number(a === NO_GROUP) - Number(b === NO_GROUP) || a.localeCompare(b)
   )
 
   const GROUP_EMOJIS: Record<string, string> = {
     'Preschool': '🎨',
     'Preteens': '🧒',
-    [SERVE_TEAM]: '🙌',
   }
 
   const handleTimeSlotSelect = (slot: string) => {
@@ -227,9 +218,7 @@ export default function ReturningPage() {
       ? 'Select the service time.'
       : step === 'group-select'
         ? 'Select your child\'s age group.'
-        : selectedGroup === SERVE_TEAM
-          ? `${SERVE_TEAM} — tap your name.`
-          : `${selectedGroup} — tap your child's name.`
+        : `${selectedGroup} — tap your child's name.`
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24 text-slate-900">
@@ -344,7 +333,7 @@ export default function ReturningPage() {
                     <span aria-hidden="true" className="text-3xl">{GROUP_EMOJIS[group] ?? '👦'}</span>
                     <span className="font-black text-slate-800 text-sm">{group}</span>
                     <span className="text-xs text-slate-500">
-                      {count} {group === SERVE_TEAM ? 'serving' : `kid${count !== 1 ? 's' : ''}`}
+                      {count} kid{count !== 1 ? 's' : ''}
                     </span>
                   </button>
                 )
@@ -368,7 +357,7 @@ export default function ReturningPage() {
 
             {/* Count */}
             <p className="text-center text-xs font-bold text-slate-500">
-              {filteredMembers.length}{selectedGroup === SERVE_TEAM ? ' serving' : ` kid${filteredMembers.length !== 1 ? 's' : ''}`}
+              {filteredMembers.length} kid{filteredMembers.length !== 1 ? 's' : ''}
               {search ? ' found' : ''}
               {totalPages > 1 ? ` · Page ${page + 1} of ${totalPages}` : ''}
             </p>
@@ -400,9 +389,6 @@ export default function ReturningPage() {
                     <p className={`text-sm leading-tight ${isSelected ? 'text-brand' : 'text-slate-500'}`}>
                       {member.lastName}, {member.firstName}
                     </p>
-                    {onRoster?.[member.memberId] && (
-                      <p className={`text-xs font-bold mt-0.5 ${isSelected ? 'text-brand' : 'text-slate-600'}`}>{onRoster[member.memberId]}</p>
-                    )}
                     {member.birthday && (
                       <p className={`text-xs mt-0.5 text-yellow-800 ${bdayToday ? 'font-bold' : ''}`}>
                         {bdayToday ? 'Birthday today!' : 'Birthday this week!'}

@@ -153,8 +153,7 @@ try {
 
   // ---------- kiosk flows for the test church ----------
   r = await call(K, 'GET', `/api/kiosk/${slug}/members`)
-  check('kiosk lists only this church\'s members', r.json?.members?.length === 2 && r.json.members.every((m) => m.lastName === `E2E${tag}`), JSON.stringify(r.json)?.slice(0, 160))
-  check('kiosk gets today\'s roster per service', r.json?.roster?.[st.id]?.[volunteerId] === 'Teacher', JSON.stringify(r.json?.roster))
+  check('kiosk lists only this church\'s kids (no Serve Team)', r.json?.members?.length === 1 && r.json.members[0].memberId === memberId && !('roster' in r.json), JSON.stringify(r.json)?.slice(0, 160))
   r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: lucbanMember.id, serviceTimeId: st.id })
   check('kiosk rejects another church\'s member', r.status === 400, `${r.status} ${r.text.slice(0, 120)}`)
   r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId, serviceTimeId: st.id, notes: 'peanuts' })
@@ -167,8 +166,9 @@ try {
   check('first-timer registration needs privacy consent', r.status === 400 && /privacy/.test(r.json?.error ?? ''), `${r.status} ${r.text.slice(0, 120)}`)
   r = await call(K, 'POST', `/api/kiosk/${slug}/register`, { ...firstTimer, consent: true })
   check('kiosk first-timer registration works', r.json?.success === true, r.text.slice(0, 160))
-  r = await call(K, 'POST', `/api/kiosk/${slug}/check-in`, { memberId: volunteerId, serviceTimeId: st.id })
-  check('rostered Serve Team member taps in at the kiosk', r.json?.success === true, r.text.slice(0, 160))
+  r = await call(L.jar, 'GET', '/api/admin/data')
+  r = await call(L.jar, 'POST', '/api/admin/attendance', { memberId: volunteerId, sessionId: r.json.session.id, serviceTimeId: st.id })
+  check('team lead checks a rostered Serve Team member in from Today', r.json?.success === true, r.text.slice(0, 160))
 
   r = await call(L.jar, 'GET', '/api/admin/data')
   const rows = r.json?.attendanceRows ?? []
