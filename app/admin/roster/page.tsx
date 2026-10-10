@@ -38,6 +38,10 @@ type RosterData = {
 
 const fetchRoster = (date: string) => requestJson<RosterData>(`/api/admin/roster?date=${date}`)
 
+// Phones show a date field in their own format; leaders read dates as mm/dd/yyyy.
+const mdy = (d: string) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`
+const weekday = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long' })
+
 const time = (ts: string) => new Date(ts).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
 
 export default function RosterPage() {
@@ -83,7 +87,19 @@ export default function RosterPage() {
 
         <label className="card block p-4">
           <span className="mb-1.5 block text-sm font-bold text-slate-700">Sunday</span>
-          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className={inputClass} />
+          {/* The native picker opens on tap; its own text is hidden under the mm/dd/yyyy label. */}
+          <span className="relative block">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              onClick={(e) => e.currentTarget.showPicker?.()}
+              className={`${inputClass.replace('text-slate-800', 'text-transparent')} cursor-pointer`}
+            />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-base text-slate-900">
+              {mdy(date)} · {weekday(date)}
+            </span>
+          </span>
         </label>
 
         {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
