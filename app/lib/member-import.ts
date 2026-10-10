@@ -6,7 +6,8 @@ export const MAX_ROWS = 2000
 export type ImportRow = {
   line: number
   name: string
-  status: 'ok' | 'duplicate' | 'error'
+  /** ok: new member. update: already a member, and the file fills some of their blanks. */
+  status: 'ok' | 'update' | 'duplicate' | 'error'
   problems: string[]
   /** Set when status is 'ok': the members row to insert (without church_id). */
   member?: {
@@ -20,9 +21,27 @@ export type ImportRow = {
     contact_number: string | null
     notes: string | null
   }
+  /** Set when status is 'update': which existing member, and the blanks the file fills (never overwrites). */
+  update?: { id: string; fills: Partial<Record<Fillable, string>>; labels: string[] }
 }
 
-export type ExistingMember = { first_name: string; last_name: string; birthday: string | null }
+export type ExistingMember = {
+  id?: string
+  first_name: string
+  last_name: string
+  birthday: string | null
+} & Partial<Record<Fillable, string | null>>
+
+// Fields an import may fill in on an existing member, when the member has them blank.
+const FILLABLE = [
+  ['nickname', 'nickname'],
+  ['birthday', 'birthday'],
+  ['age_group_id', 'age group'],
+  ['parent_name', 'parent / guardian'],
+  ['contact_number', 'contact number'],
+  ['notes', 'notes'],
+] as const
+type Fillable = (typeof FILLABLE)[number][0]
 
 // RFC 4180: quoted fields may hold commas, quotes ("") and line breaks.
 export function parseCsv(text: string): string[][] {
@@ -130,7 +149,13 @@ export function checkImport(
   }
 
   const groupByName = new Map(ageGroups.map((g) => [g.name.toLowerCase(), g.id]))
-  const seen = new Set(existing.map((m) => key(m.first_name.trim(), m.last_name.trim(), m.birthday)))
+  const seen = new Set<string>()
+  const matched = new Set<ExistingMember>()
+  const byName = new Map<string, ExistingMember[]>()
+  for (const m of existing) {
+    const k = key(m.first_name.trim(), m.last_name.trim(), null)
+    byName.set(k, [...(byName.get(k) ?? []), m])
+  }
 
   // The header is line 1, so data starts at line 2 (blank lines are skipped, which is fine for a hint).
   return {
@@ -169,8 +194,42 @@ export function checkImport(
       const name = [first, last].filter(Boolean).join(' ') || '(no name)'
       if (problems.length) return { line: i + 2, name, status: 'error', problems }
 
-      const k = key(first, last, birthday as string | null)
-      if (seen.has(k)) return { line: i + 2, name, status: 'duplicate', problems: ['Already a member, or listed twice in this file. Skipped.'] }
+      const member: NonNullable<ImportRow['member']> = {
+        first_name: first,
+        last_name: last,
+        nickname: get('nickname') || null,
+        birthday: birthday as string | null,
+        role: role!,
+        age_group_id: ageGroupId,
+        parent_name: get('parent') || null,
+        contact_number: get('contact') || null,
+        notes: get('notes') || null,
+      }
+
+      // Same name, and birthdays that don't disagree (equal, or one is blank): the same person.
+      const same = (byName.get(key(first, last, null)) ?? []).filter((m) => !m.birthday || !member.birthday || m.birthday === member.birthday)
+      if (same.length > 1) {
+        return { line: i + 2, name, status: 'error', problems: [`More than one member is called ${name}. Update them on the Members page instead.`] }
+      }
+      if (same.length === 1) {
+        const m = same[0]
+        if (matched.has(m)) return { line: i + 2, name, status: 'duplicate', problems: ['Listed twice in this file. Skipped.'] }
+        matched.add(m)
+        const fills: Partial<Record<Fillable, string>> = {}
+        const labels: string[] = []
+        for (const [field, label] of FILLABLE) {
+          const value = member[field]
+          if (!m[field] && value) {
+            fills[field] = value
+            labels.push(label)
+          }
+        }
+        if (!labels.length || !m.id) return { line: i + 2, name, status: 'duplicate', problems: ['Already a member, nothing new to add. Skipped.'] }
+        return { line: i + 2, name, status: 'update', problems: [], update: { id: m.id, fills, labels } }
+      }
+
+      const k = key(first, last, member.birthday)
+      if (seen.has(k)) return { line: i + 2, name, status: 'duplicate', problems: ['Listed twice in this file. Skipped.'] }
       seen.add(k)
 
       return {
@@ -178,17 +237,7 @@ export function checkImport(
         name,
         status: 'ok',
         problems: [],
-        member: {
-          first_name: first,
-          last_name: last,
-          nickname: get('nickname') || null,
-          birthday: birthday as string | null,
-          role: role!,
-          age_group_id: ageGroupId,
-          parent_name: get('parent') || null,
-          contact_number: get('contact') || null,
-          notes: get('notes') || null,
-        },
+        member,
       }
     }),
   }

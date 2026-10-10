@@ -27,14 +27,15 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🔍',
     title: 'Check, then import',
-    body: 'Choose the file to see every row first. Nothing is saved until you tap Import. People already in your list are skipped, so you can fix the file and upload it again.',
+    body: 'Choose the file to see every row first. Nothing is saved until you tap Import. People already in your list are never added twice: if the file has details they are missing, like a contact number or birthday, those blanks are filled in. Nothing already saved is changed, so you can fix the file and upload it again.',
   },
 ]
 
-type Preview = { rows: ImportRow[]; imported: number }
+type Preview = { rows: ImportRow[]; imported: number; updated: number }
 
 const STATUS = {
-  ok: { label: 'Ready', className: 'bg-green-50 text-green-800' },
+  ok: { label: 'New', className: 'bg-green-50 text-green-800' },
+  update: { label: 'Fill in', className: 'bg-blue-50 text-brand' },
   duplicate: { label: 'Skipped', className: 'bg-slate-100 text-slate-700' },
   error: { label: 'Problem', className: 'bg-red-50 text-red-800' },
 } as const
@@ -45,7 +46,7 @@ export default function ImportMembersPage() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState<number | null>(null)
+  const [done, setDone] = useState<{ imported: number; updated: number } | null>(null)
 
   const send = (text: string, confirm: boolean) =>
     requestJson<Preview>('/api/admin/members/import', { method: 'POST', body: { csv: text, confirm } })
@@ -70,7 +71,7 @@ export default function ImportMembersPage() {
     setError('')
     const res = await send(csv, true)
     if (res.ok) {
-      setDone(res.data.imported)
+      setDone({ imported: res.data.imported, updated: res.data.updated })
       setPreview(null)
     } else {
       setError(res.error)
@@ -80,8 +81,9 @@ export default function ImportMembersPage() {
 
   const count = (s: ImportRow['status']) => preview?.rows.filter((r) => r.status === s).length ?? 0
   const ready = count('ok')
+  const fills = count('update')
   // Problems first, so they're not missed at the bottom of a long list.
-  const order = { error: 0, ok: 1, duplicate: 2 }
+  const order = { error: 0, ok: 1, update: 2, duplicate: 3 }
   const rows = [...(preview?.rows ?? [])].sort((a, b) => order[a.status] - order[b.status] || a.line - b.line)
 
   return (
@@ -126,7 +128,9 @@ export default function ImportMembersPage() {
         {error && <Notice kind="error">{error}</Notice>}
         {done !== null && (
           <Notice kind="success">
-            {done === 0 ? 'Nothing new to import.' : `Imported ${done} member${done === 1 ? '' : 's'}.`}{' '}
+            {done.imported + done.updated === 0
+              ? 'Nothing new to import.'
+              : [done.imported && `Added ${done.imported} member${done.imported === 1 ? '' : 's'}.`, done.updated && `Filled in details for ${done.updated}.`].filter(Boolean).join(' ')}{' '}
             <Link href="/admin/members" className="underline">View members</Link>
           </Notice>
         )}
@@ -135,7 +139,7 @@ export default function ImportMembersPage() {
           <div className="card p-4 space-y-3">
             <p className="text-sm font-bold text-slate-700">3. Check the rows, then import.</p>
             <p className="text-sm text-slate-700">
-              <strong>{ready}</strong> ready · <strong>{count('duplicate')}</strong> already in your list ·{' '}
+              <strong>{ready}</strong> new · <strong>{fills}</strong> to fill in · <strong>{count('duplicate')}</strong> skipped ·{' '}
               <strong>{count('error')}</strong> with problems
             </p>
             {count('error') > 0 && (
@@ -146,10 +150,12 @@ export default function ImportMembersPage() {
 
             <button
               onClick={handleImport}
-              disabled={busy || ready === 0}
+              disabled={busy || ready + fills === 0}
               className="w-full rounded-2xl bg-brand px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
             >
-              {ready === 0 ? 'Nothing to import' : `Import ${ready} member${ready === 1 ? '' : 's'}`}
+              {ready + fills === 0
+                ? 'Nothing to import'
+                : [ready && `Add ${ready} new`, fills && `fill in ${fills}`].filter(Boolean).join(' and ').replace(/^./, (c) => c.toUpperCase())}
             </button>
 
             <ul className="space-y-2">
@@ -166,6 +172,7 @@ export default function ImportMembersPage() {
                     {r.member && ` · ${r.member.role === 'volunteer' ? 'Serve Team' : 'Child'}`}
                     {r.member?.birthday && ` · Birthday ${new Date(`${r.member.birthday}T00:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                   </p>
+                  {r.update && <p className="text-xs font-bold text-brand">Will fill in: {r.update.labels.join(', ')}</p>}
                   {r.problems.map((p) => (
                     <p key={p} className={`text-xs font-bold ${r.status === 'error' ? 'text-red-700' : 'text-slate-600'}`}>{p}</p>
                   ))}

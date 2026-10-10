@@ -200,6 +200,25 @@ try {
   const { count: imported } = await admin.from('members').select('id', { count: 'exact', head: true }).eq('church_id', church.id)
   check('test church now has 5 members', imported === 5, String(imported))
 
+  // ---------- import fills blanks only; export round-trips ----------
+  const fillCsv = [
+    'Last Name,First Name,Nickname,Birthday,Role,Age Group,Parent / Guardian,Contact Number,Notes',
+    `E2E${tag},Ana,,2019-01-01,,,Ana Parent,09170001111,`,
+    `E2E${tag},Cara,,2018-03-25,,,,09999999999,`,
+  ].join('\r\n')
+  r = await call(L.jar, 'POST', '/api/admin/members/import', { csv: fillCsv })
+  check('import preview: fill in Ana\'s blanks, skip Cara (nothing blank)', r.json?.rows?.map((x) => x.status).join() === 'update,duplicate' && r.json.rows[0].update.labels.join() === 'birthday,parent / guardian,contact number', r.text.slice(0, 240))
+  r = await call(L.jar, 'POST', '/api/admin/members/import', { csv: fillCsv, confirm: true })
+  check('import fills in 1, adds 0', r.json?.updated === 1 && r.json.imported === 0, r.text.slice(0, 160))
+  const { data: filled } = await admin.from('members').select('first_name, birthday, parent_name, contact_number, age_group_id').eq('church_id', church.id).in('first_name', ['Ana', 'Cara']).order('first_name')
+  check('Ana\'s blanks are filled and her age group kept', filled?.[0]?.birthday === '2019-01-01' && filled[0].contact_number === '09170001111' && filled[0].age_group_id === ag.id, JSON.stringify(filled?.[0]))
+  check('Cara\'s saved contact number is not overwritten', filled?.[1]?.contact_number === '09171234567', JSON.stringify(filled?.[1]))
+  r = await call(L.jar, 'GET', '/api/admin/members/export')
+  const exported = r.text.replace(/^\ufeff/, '').trim().split('\r\n')
+  check('members export: template columns plus Active, one row each', exported[0] === 'Last Name,First Name,Nickname,Birthday,Role,Age Group,Parent / Guardian,Contact Number,Notes,Active' && exported.length === 6 && r.text.includes('"=""09171234567"""'), exported.slice(0, 2).join(' | '))
+  r = await call(L.jar, 'POST', '/api/admin/members/import', { csv: r.text, confirm: true })
+  check('re-importing our own export changes nothing', r.json?.imported === 0 && r.json.updated === 0, r.text.slice(0, 200))
+
   // ---------- pick-ups, per service ----------
   const { data: st2 } = await admin.from('service_times').insert({ church_id: church.id, label: 'Special Event', sort_order: 2 }).select('id').single()
   const { data: cara } = await admin.from('members').select('id').eq('church_id', church.id).eq('first_name', 'Cara').single()
