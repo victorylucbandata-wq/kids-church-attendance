@@ -10,6 +10,12 @@ const B = process.argv[2] ?? 'http://localhost:3000'
 const tag = Math.random().toString(36).slice(2, 8)
 const slug = `e2e-test-${tag}`
 
+// The highlighted tab's text on an admin page ('' when the page has no tabs).
+const activeTab = (html) => {
+  const a = html.split('aria-current="page"')[1] ?? ''
+  return a.slice(a.indexOf('>') + 1).split('</a>')[0].replace(/<[^>]*>|[^A-Za-z]/g, '')
+}
+
 let passed = 0, failed = 0
 const check = (name, ok, extra = '') => { ok ? passed++ : failed++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra && !ok ? `  -> ${extra}` : ''}`) }
 
@@ -95,6 +101,16 @@ try {
   check('single-church lead goes straight in', r.json?.success && r.json.church?.slug === slug, JSON.stringify(r.json)?.slice(0, 160))
   r = await call(L.jar, 'POST', '/api/admin/church', { churchId: lucban.id })
   check('lead cannot switch into Lucban', r.status === 403)
+
+  // ---------- navigation ----------
+  for (const [path, tab] of [['/admin', 'Today'], ['/admin/members', 'Members'], ['/admin/members/import', 'Members'], ['/admin/sessions', 'History'], ['/admin/settings', 'Settings'], ['/admin/age-groups', 'Settings'], ['/admin/service-times', 'Settings'], ['/admin/team', 'Settings']]) {
+    r = await call(L.jar, 'GET', path)
+    check(`${path} shows the tabs with ${tab} highlighted`, r.status === 200 && activeTab(r.text) === tab && r.text.includes('href="/admin/settings"'), `${r.status} active=${activeTab(r.text)}`)
+  }
+  r = await call(L.jar, 'GET', '/admin/settings')
+  check('lead sees Team in Settings, not Switch church (one church)', r.text.includes('href="/admin/team"') && !r.text.includes('href="/admin/choose"'))
+  r = await call(null, 'GET', '/admin/login')
+  check('sign-in page has no tabs', r.status === 200 && !r.text.includes('aria-label="Admin sections"'))
   r = await call(L.jar, 'POST', '/api/admin/session')
   check('lead starts today\'s session', r.json?.success === true, r.text.slice(0, 160))
   r = await call(L.jar, 'POST', '/api/admin/members', { first_name: 'Ana', last_name: `E2E${tag}`, role: 'child', age_group_id: ag.id })
@@ -156,6 +172,8 @@ try {
   check('volunteer cannot open team', r.status === 403, `${r.status}`)
   r = await call(V.jar, 'GET', '/api/admin/data')
   check('volunteer can run the dashboard', r.json?.success === true)
+  r = await call(V.jar, 'GET', '/admin/settings')
+  check('volunteer does not see Team in Settings', r.status === 200 && r.text.includes('href="/admin/age-groups"') && !r.text.includes('href="/admin/team"'))
   r = await call(L.jar, 'DELETE', '/api/admin/team', { userId: vol.id })
   check('lead removes volunteer', r.json?.success === true, r.text.slice(0, 120))
   r = await call(V.jar, 'GET', '/api/admin/data')

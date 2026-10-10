@@ -85,12 +85,10 @@ export default function TeamPage() {
     <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
       <Decor />
       <div className="relative mx-auto max-w-md space-y-4">
-        <Link href="/admin" className="inline-flex min-h-11 items-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
-          ← Dashboard
-        </Link>
+        <Link href="/admin/settings" className="inline-block py-3 text-sm font-bold text-brand hover:underline">← Settings</Link>
 
         <div className="text-center">
-          <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">👥</span>Team</h1>
+          <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">🔑</span>Team</h1>
         </div>
 
         {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}

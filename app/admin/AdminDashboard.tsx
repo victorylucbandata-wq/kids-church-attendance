@@ -7,7 +7,6 @@ import { AdminData } from '@/app/lib/types'
 import { isBirthdayToday, isBirthdayThisWeek } from '@/app/lib/birthday'
 import HelpWizard, { HelpStep } from '@/app/components/HelpWizard'
 import { requestJson } from '@/app/lib/api'
-import SignOutButton from './SignOutButton'
 import { inputClass } from '@/app/lib/ui'
 import Decor from '@/app/components/Decor'
 
@@ -18,9 +17,14 @@ const HELP_STEPS: HelpStep[] = [
     body: 'This is the leader page. Use it to open check-in for the day, watch who has arrived, and check kids out when parents pick them up.',
   },
   {
+    emoji: '🧭',
+    title: 'Getting around',
+    body: 'Use the tabs at the top on any page: Today for this service, Members for the list of kids and Serve Team, History for past Sundays and exports, and Settings for age groups, service times and your team.',
+  },
+  {
     emoji: '▶️',
     title: 'Start the session',
-    body: 'Tap Generate to create today\'s session. Do this once at the start of the day. Parents can\'t check in until a session is active.',
+    body: 'On Sundays, check-in opens by itself 30 minutes before each service time. On other days, tap Generate once at the start of the day. Parents can\'t check in until a session is active.',
   },
   {
     emoji: '📊',
@@ -167,24 +171,19 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
       <Decor />
       <div className="relative mx-auto max-w-2xl space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header: church, sign-in and tabs are in AdminNav (admin layout) */}
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📋</span>{data?.church.name ?? 'Attendance Dashboard'}</h1>
+            <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📋</span>Today</h1>
             <p className="text-sm text-slate-600">
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              {' · '}
-              <Link href="/admin/choose" className="font-bold text-brand hover:underline">Switch church</Link>
             </p>
-            {data?.email && (
-              <p className="text-sm text-slate-600">
-                Signed in as <span className="font-bold text-slate-800">{data.email}</span>
-                {' · '}
-                {data.role === 'lead' ? 'Lead' : data.role === 'volunteer' ? 'Volunteer' : 'Network admin (view only)'}
-              </p>
-            )}
           </div>
-          <SignOutButton className="min-h-11 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60" />
+          {data?.church && (
+            <Link href={`/${data.church.slug}`} className="flex min-h-11 shrink-0 items-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
+              Open kiosk →
+            </Link>
+          )}
         </div>
 
         {data?.role === 'network' && (
@@ -192,16 +191,6 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
             Network view: you can see this church&apos;s dashboard, but changes are made by its own leaders.
           </div>
         )}
-
-        {/* Quick nav */}
-        <nav aria-label="Admin sections" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Link href="/admin/members" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Members</Link>
-          <Link href="/admin/age-groups" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Age Groups</Link>
-          <Link href="/admin/service-times" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Service Times</Link>
-          <Link href="/admin/sessions" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Past Sessions</Link>
-          {data?.role === 'lead' && <Link href="/admin/team" className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Team</Link>}
-          {data?.church && <Link href={`/${data.church.slug}`} className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-3 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">Kiosk link</Link>}
-        </nav>
 
         {/* Error state */}
         {actionError && (
@@ -530,11 +519,6 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           </p>
         )}
 
-        <div className="text-center">
-          <Link href="/" className="inline-block px-4 py-3 text-sm font-bold text-slate-600 hover:text-slate-900">
-            ← Back to Check-In
-          </Link>
-        </div>
       </div>
 
       <HelpWizard title="Admin guide" steps={HELP_STEPS} />
