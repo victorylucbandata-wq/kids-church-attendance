@@ -121,30 +121,22 @@ export default function MembersPage() {
     <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
       <Decor />
       <div className="relative mx-auto max-w-2xl space-y-4">
-
-        <div className="flex gap-2">
-          <Link href="/admin" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            ← Dashboard
-          </Link>
-          <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Age Groups
-          </Link>
-          <Link href="/admin/members/import" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Import
-          </Link>
-        </div>
-
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">👥</span>Members</h1>
             <p className="text-sm text-slate-600">{members.length} member{members.length !== 1 ? 's' : ''}</p>
           </div>
-          <button
-            onClick={() => router.push('/admin/members/new')}
-            className="min-h-11 rounded-2xl bg-brand px-5 py-2.5 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong"
-          >
-            + Add Member
-          </button>
+          <div className="flex gap-2">
+            <Link href="/admin/members/import" className="flex min-h-11 items-center whitespace-nowrap rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
+              Import
+            </Link>
+            <button
+              onClick={() => router.push('/admin/members/new')}
+              className="min-h-11 whitespace-nowrap rounded-2xl bg-brand px-5 py-2.5 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong"
+            >
+              + Add Member
+            </button>
+          </div>
         </div>
 
         {/* Filters */}

@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/app/lib/supabase/server'
@@ -38,7 +39,8 @@ export async function listAccess(userId: string) {
   return { churches, isNetworkAdmin: !!net }
 }
 
-async function resolve(): Promise<Resolved> {
+// cache: the admin layout and its page both ask, once per request is enough.
+const resolve = cache(async (): Promise<Resolved> => {
   const db = await createClient()
   const { data: { user } } = await db.auth.getUser()
   if (!user) return { status: 'signed-out' }
@@ -64,7 +66,7 @@ async function resolve(): Promise<Resolved> {
 
   if (!church || !role) return { status: 'choose-church', userId: user.id, isNetworkAdmin }
   return { status: 'ok', ctx: { db, userId: user.id, email: user.email ?? '', church, role, isNetworkAdmin } }
-}
+})
 
 /** For server components under /admin: redirects when signed out or no church is picked. */
 export async function requireAdminPage(): Promise<AdminContext> {

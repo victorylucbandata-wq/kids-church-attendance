@@ -111,14 +111,7 @@ export default function ServiceTimesPage() {
     <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
       <Decor />
       <div className="relative mx-auto max-w-md space-y-4">
-        <div className="flex gap-2">
-          <Link href="/admin" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            ← Dashboard
-          </Link>
-          <Link href="/admin/age-groups" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Age Groups
-          </Link>
-        </div>
+        <Link href="/admin/settings" className="inline-block py-3 text-sm font-bold text-brand hover:underline">← Settings</Link>
 
         <div className="text-center">
           <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">🕘</span>Service Times</h1>
@@ -158,7 +151,7 @@ export default function ServiceTimesPage() {
             <p className="py-4 text-center text-sm text-slate-600">No service times yet. Parents can&apos;t check in until you add one.</p>
           )}
           {active.map((t, i) => (
-            <div key={t.id} className="flex items-center gap-2 rounded-2xl border-2 border-blue-50 bg-white px-4 py-3">
+            <div key={t.id} className="flex flex-wrap items-center gap-x-2 rounded-2xl border-2 border-blue-50 bg-white px-4 py-3">
               {editingId === t.id ? (
                 <>
                   <input
@@ -184,10 +177,7 @@ export default function ServiceTimesPage() {
                 </>
               ) : (
                 <>
-                  <span className="flex-1">
-                    <span className="block text-sm font-black text-slate-800">{t.label}</span>
-                    <span className="block text-xs text-slate-600">{clockNote(t.label)}</span>
-                  </span>
+                  <span className="flex-1 whitespace-nowrap text-sm font-black text-slate-800">{t.label}</span>
                   <div className="flex gap-1">
                     <button onClick={() => move(i, -1)} disabled={i === 0 || busy} aria-label={`Move ${t.label} up`} className={smallButton}>↑</button>
                     <button onClick={() => move(i, 1)} disabled={i === active.length - 1 || busy} aria-label={`Move ${t.label} down`} className={smallButton}>↓</button>
@@ -207,6 +197,7 @@ export default function ServiceTimesPage() {
                       Remove
                     </button>
                   </div>
+                  <span className="basis-full text-xs text-slate-600">{clockNote(t.label)}</span>
                 </>
               )}
             </div>

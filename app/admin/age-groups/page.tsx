@@ -117,14 +117,7 @@ export default function AgeGroupsPage() {
       <Decor />
       <div className="relative mx-auto max-w-md space-y-4">
 
-        <div className="flex gap-2">
-          <Link href="/admin" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            ← Dashboard
-          </Link>
-          <Link href="/admin/members" className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-center text-sm font-black text-brand transition hover:bg-blue-50">
-            Members
-          </Link>
-        </div>
+        <Link href="/admin/settings" className="inline-block py-3 text-sm font-bold text-brand hover:underline">← Settings</Link>
 
         <div className="text-center">
           <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">🏷️</span>Age Groups</h1>

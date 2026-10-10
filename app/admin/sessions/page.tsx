@@ -1,6 +1,5 @@
 import { requireAdminPage, type AdminContext } from '@/app/lib/church'
 import { listServiceTimes } from '@/app/lib/service-times'
-import Link from 'next/link'
 import Decor from '@/app/components/Decor'
 
 type SessionRow = {
@@ -89,14 +88,11 @@ export default async function SessionsPage() {
       <Decor />
       <div className="relative mx-auto max-w-2xl space-y-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📅</span>Past Sessions</h1>
-          <p className="text-sm text-slate-600">{sessions.length} sessions recorded</p>
+          <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">📅</span>History</h1>
+          <p className="text-sm text-slate-600">{sessions.length} past sessions</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin" className="inline-flex min-h-11 items-center rounded-2xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm font-black text-brand transition hover:bg-blue-50">
-            ← Back to Dashboard
-          </Link>
           {sessions.length > 0 && (
             // Plain <a>: this is a file download, not a page navigation.
             <a
