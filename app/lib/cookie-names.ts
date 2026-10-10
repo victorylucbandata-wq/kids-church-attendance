@@ -2,3 +2,5 @@
 export const SESSION_LIMIT_COOKIE = 'session_limit'
 export const SHARED_DEVICE_COOKIE = 'shared_device'
 export const CHURCH_COOKIE = 'church_id'
+// Marks a church's own check-in device: `<church id>.<churches.kiosk_key>`.
+export const KIOSK_COOKIE = 'kiosk_device'

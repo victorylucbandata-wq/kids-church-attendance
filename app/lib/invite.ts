@@ -19,7 +19,7 @@ export async function emailsById(admin: Admin, ids: string[]): Promise<Map<strin
  * Supabase Send Email hook); existing accounts are simply added and can sign in as usual.
  */
 export async function grantAccess(
-  opts: { email: string; churchId: string; role: 'lead' | 'volunteer'; invitedBy: string; origin: string }
+  opts: { email: string; churchId: string; role: 'lead' | 'volunteer' | 'staff'; invitedBy: string; origin: string }
 ): Promise<{ ok: true; invited: boolean } | { ok: false; error: string; status: number }> {
   const email = opts.email.trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: 'Enter a valid email address.', status: 400 }

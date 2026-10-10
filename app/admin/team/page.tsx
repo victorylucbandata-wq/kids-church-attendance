@@ -21,8 +21,8 @@ const HELP_STEPS: HelpStep[] = [
   },
   {
     emoji: '🧭',
-    title: 'Lead or Volunteer',
-    body: 'Both can check kids in and out and manage members, age groups and service times. Only Leads can invite or remove people.',
+    title: 'Lead, Volunteer or Staff',
+    body: 'Leads and Volunteers can check kids in and out and manage members, age groups, service times and the roster. Only Leads can invite or remove people. Staff see the headcount numbers only, never kids\' names or contacts.',
   },
   {
     emoji: '🚪',
@@ -31,7 +31,10 @@ const HELP_STEPS: HelpStep[] = [
   },
 ]
 
-type Member = { userId: string; email: string; role: 'lead' | 'volunteer'; isYou: boolean }
+type Role = 'lead' | 'volunteer' | 'staff'
+type Member = { userId: string; email: string; role: Role; isYou: boolean }
+
+const ROLE_LABEL: Record<Role, string> = { lead: 'Lead', volunteer: 'Volunteer', staff: 'Staff' }
 
 const fetchTeam = () => requestJson<{ team: Member[] }>('/api/admin/team')
 
@@ -40,7 +43,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'volunteer' | 'lead'>('volunteer')
+  const [role, setRole] = useState<Role>('volunteer')
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const load = async () => {
@@ -109,7 +112,7 @@ export default function TeamPage() {
           </label>
           <fieldset className="flex gap-2">
             <legend className="sr-only">Role</legend>
-            {(['volunteer', 'lead'] as const).map((r) => (
+            {(['volunteer', 'lead', 'staff'] as const).map((r) => (
               <label
                 key={r}
                 className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-2xl border-2 px-3 text-sm font-black transition ${
@@ -117,7 +120,7 @@ export default function TeamPage() {
                 }`}
               >
                 <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} className="sr-only" />
-                {r === 'lead' ? 'Lead' : 'Volunteer'}
+                {ROLE_LABEL[r]}
               </label>
             ))}
           </fieldset>
@@ -134,24 +137,24 @@ export default function TeamPage() {
           {loading && <p role="status" className="py-4 text-center text-sm text-slate-600">Loading…</p>}
           {team.map((m) => (
             <div key={m.userId} className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-blue-50 bg-white px-4 py-3">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 basis-full">
                 <p className="truncate text-sm font-black text-slate-800">
                   {m.email}
                   {m.isYou && <span className="ml-2 text-xs font-bold text-slate-600">(you)</span>}
                 </p>
-                <p className="text-xs font-bold text-slate-600">{m.role === 'lead' ? 'Lead' : 'Volunteer'}</p>
               </div>
-              <button
-                onClick={() =>
-                  run('PATCH', { userId: m.userId, role: m.role === 'lead' ? 'volunteer' : 'lead' }, () =>
-                    `${m.email} is now a ${m.role === 'lead' ? 'Volunteer' : 'Lead'}.`
-                  )
-                }
+              <select
+                aria-label={`Role for ${m.email}`}
+                value={m.role}
+                onChange={(e) => {
+                  const next = e.target.value as Role
+                  run('PATCH', { userId: m.userId, role: next }, () => `${m.email} is now ${ROLE_LABEL[next]}.`)
+                }}
                 disabled={busy}
-                className="min-h-11 rounded-lg px-3 text-sm font-bold text-brand hover:bg-blue-50"
+                className="min-h-11 rounded-xl border-2 border-blue-100 bg-white px-2 text-sm font-bold text-slate-800"
               >
-                {m.role === 'lead' ? 'Make Volunteer' : 'Make Lead'}
-              </button>
+                {(['lead', 'volunteer', 'staff'] as const).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+              </select>
               <button
                 onClick={() => {
                   if (confirm(`Remove ${m.email} from this church? They lose access right away.`)) {

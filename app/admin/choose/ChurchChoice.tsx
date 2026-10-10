@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { requestJson } from '@/app/lib/api'
 import Notice from '@/app/components/Notice'
 
-type Choice = { id: string; name: string; role: 'lead' | 'volunteer' }
+type Choice = { id: string; name: string; role: 'lead' | 'volunteer' | 'staff' }
 
 export default function ChurchChoice({ churches }: { churches: Choice[] }) {
   const router = useRouter()
@@ -38,7 +38,7 @@ export default function ChurchChoice({ churches }: { churches: Choice[] }) {
         >
           <span>
             <span className="block text-lg font-black text-slate-800">{c.name}</span>
-            <span className="block text-sm text-slate-600">{c.role === 'lead' ? 'Lead' : 'Volunteer'}</span>
+            <span className="block text-sm text-slate-600">{c.role === 'lead' ? 'Lead' : c.role === 'staff' ? 'Staff (headcount only)' : 'Volunteer'}</span>
           </span>
           <span className="text-sm font-black text-brand">{busy === c.id ? 'Opening…' : 'Open →'}</span>
         </button>

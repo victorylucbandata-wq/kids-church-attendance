@@ -10,6 +10,7 @@ export default async function SettingsPage() {
   const items = [
     { href: '/admin/age-groups', emoji: '🏷️', label: 'Age Groups', desc: 'The groups kids are sorted into, like Preschool and Preteens.', show: true },
     { href: '/admin/service-times', emoji: '🕘', label: 'Service Times', desc: 'Your service times, and when check-in opens and closes on Sundays.', show: true },
+    { href: '/admin/kiosk', emoji: '🔒', label: 'Check-in devices', desc: 'Choose which tablets or phones can open the kiosk.', show: ctx.role === 'lead' },
     { href: '/admin/team', emoji: '🔑', label: 'Team', desc: 'Who can sign in here. Invite or remove leaders and volunteers.', show: ctx.role === 'lead' },
     { href: '/admin/choose', emoji: '🔄', label: 'Switch church', desc: 'Open another church you help with.', show: churches.length > 1 || ctx.isNetworkAdmin },
     { href: '/network', emoji: '🌏', label: 'Network overview', desc: 'Every church at a glance, and the combined export.', show: ctx.isNetworkAdmin },

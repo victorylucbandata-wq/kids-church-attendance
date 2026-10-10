@@ -17,11 +17,13 @@ const eslintConfig = defineConfig([
       "app/api/admin/team/**",
       "app/api/admin/service-times/**",
       "app/api/admin/sessions/export/**",
+      "app/api/admin/kiosk-device/**", // Lead-only: turns check-in devices on/off (churches.kiosk_key)
       "app/lib/church.ts",
       "app/lib/kiosk.ts",
       "app/lib/invite.ts",
       "app/lib/service-times.ts",
       "app/lib/network-overview.ts",
+      "app/lib/headcount.ts", // numbers only, for Staff, who can't read kids' records themselves
       "app/lib/supabase/admin.ts",
       "app/page.tsx",
     ],
