@@ -1,7 +1,8 @@
 import type { AdminContext } from '@/app/lib/church'
 import { formatDisplayName } from '@/app/lib/display-name'
 import { listServiceTimes } from '@/app/lib/service-times'
-import { todayInManila } from '@/app/lib/dates'
+import { manilaClock, todayInManila } from '@/app/lib/dates'
+import { closedBy } from '@/app/lib/service-clock'
 
 // Today's dashboard for the signed-in person's church. Shared by /admin (first render)
 // and /api/admin/data (20-second refresh).
@@ -29,6 +30,7 @@ export async function loadDashboardData(ctx: AdminContext) {
       serviceTimes,
       session: null,
       roster,
+      closedServiceIds: [],
       attendanceRows: [],
       firstTimers: [],
       summary: {
@@ -61,6 +63,7 @@ export async function loadDashboardData(ctx: AdminContext) {
     return {
       attendanceId: a?.id ?? m.id,
       memberId: m.id,
+      serviceTimeId: a?.service_time_id ?? null,
       memberName: formatDisplayName(m.first_name, m.last_name, m.nickname),
       firstName: m.first_name,
       lastName: m.last_name,
@@ -120,6 +123,8 @@ export async function loadDashboardData(ctx: AdminContext) {
     serviceTimes,
     session,
     roster,
+    // On Sundays, services whose check-in has closed: kids from them not marked picked up get flagged.
+    closedServiceIds: manilaClock().sunday ? closedBy(serviceTimes, manilaClock().minutes).map((st) => st.id) : [],
     attendanceRows,
     firstTimers,
     summary: {

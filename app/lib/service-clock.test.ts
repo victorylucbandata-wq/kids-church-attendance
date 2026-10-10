@@ -1,7 +1,7 @@
 // Run: node --test app/lib/service-clock.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { formatMinutes, serviceAt, startMinutes } from './service-clock.ts'
+import { closedBy, formatMinutes, serviceAt, startMinutes } from './service-clock.ts'
 import { manilaClock } from './dates.ts'
 
 const at = (h: number, m = 0) => h * 60 + m
@@ -43,4 +43,10 @@ test('formats and Manila clock', () => {
   assert.deepEqual(manilaClock(new Date('2026-10-11T00:30:00Z')), { sunday: true, minutes: at(8, 30) })
   assert.deepEqual(manilaClock(new Date('2026-10-10T23:00:00Z')), { sunday: true, minutes: at(7) })
   assert.deepEqual(manilaClock(new Date('2026-10-11T16:00:00Z')), { sunday: false, minutes: 0 })
+})
+
+test('services count as closed from 90 minutes after they start', () => {
+  assert.deepEqual(closedBy(lucban, at(10, 29)), [])
+  assert.deepEqual(closedBy(lucban, at(10, 30)).map((t) => t.label), ['9:00 AM'])
+  assert.deepEqual(closedBy(lucban, at(13)).map((t) => t.label), ['9:00 AM', '11:00 AM'])
 })

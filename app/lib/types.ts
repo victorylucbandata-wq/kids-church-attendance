@@ -26,6 +26,7 @@ export type UncheckedMember = {
 export type AttendanceRow = {
   attendanceId: string
   memberId: string
+  serviceTimeId: string | null
   memberName: string
   firstName: string
   lastName: string
@@ -64,6 +65,8 @@ export type AdminData = {
   session: Session | null
   /** Today's Serve Team roster, per service. */
   roster: { serviceTimeId: string; memberId: string; serveRole: string; memberName: string }[]
+  /** Sunday services whose check-in has closed (kids from them should have been picked up). */
+  closedServiceIds: string[]
   attendanceRows: AttendanceRow[]
   firstTimers: FirstTimerRecord[]
   summary: {
