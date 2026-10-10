@@ -8,23 +8,23 @@ import Notice from '@/app/components/Notice'
 import { inputClass } from '@/app/lib/ui'
 import { requestJson } from '@/app/lib/api'
 import { nextSundayInManila } from '@/app/lib/dates'
-import { SERVE_ROLES, byServeRole } from '@/app/lib/serve-roles'
+import { SERVE_ROLES } from '@/app/lib/serve-roles'
 
 const HELP_STEPS: HelpStep[] = [
   {
     emoji: '🙌',
     title: 'Plan who serves',
-    body: 'Pick the Sunday, then add Serve Team members to each service with their role, like Registration or Games. Each service has its own list.',
+    body: 'Pick the Sunday with the arrows, or tap the date. Choose the service, then pick someone for each role. Leave a role on "Pick someone" if nobody is doing it.',
   },
   {
-    emoji: '👆',
-    title: 'Checking in',
-    body: 'On the day, the team lead checks each person in from the Serve Team card on the Today tab. The kiosk is for kids only.',
+    emoji: '➕',
+    title: 'More than one person',
+    body: 'Tap "+ another" under a role, like Music Team, to add a second person. Choose "Nobody" in a list to take someone off.',
   },
   {
     emoji: '✅',
-    title: 'Who has arrived',
-    body: 'On the day itself, a tick and the time show next to everyone who has been checked in. The Today tab shows the same.',
+    title: 'On the day',
+    body: 'The team lead checks each person in from the Serve Team card on the Today tab. A tick and the time show here too.',
   },
 ]
 
@@ -33,22 +33,34 @@ type RosterData = {
   serviceTimes: { id: string; label: string }[]
   volunteers: { id: string; name: string }[]
   roster: Entry[]
-  roles: string[]
 }
 
 const fetchRoster = (date: string) => requestJson<RosterData>(`/api/admin/roster?date=${date}`)
 
 // Phones show a date field in their own format; leaders read dates as mm/dd/yyyy.
 const mdy = (d: string) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`
-const weekday = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'long' })
-
+const weekday = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-PH', { weekday: 'short' })
+const addDays = (d: string, n: number) => {
+  const t = new Date(`${d}T00:00:00Z`)
+  t.setUTCDate(t.getUTCDate() + n)
+  return t.toISOString().slice(0, 10)
+}
 const time = (ts: string) => new Date(ts).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })
+
+// "Team Leader (& Tithes and Offering)" → the name in bold, the extra duty quieter.
+const roleParts = (role: string) => {
+  const i = role.indexOf(' (')
+  return i < 0 ? [role, ''] : [role.slice(0, i), role.slice(i + 1)]
+}
+
+const arrowButton = 'min-h-11 min-w-11 shrink-0 rounded-2xl border-2 border-blue-100 bg-white text-lg font-black text-brand hover:bg-blue-50'
 
 export default function RosterPage() {
   const [date, setDate] = useState(nextSundayInManila)
   const [data, setData] = useState<RosterData | null>(null)
+  const [serviceId, setServiceId] = useState('')
+  const [extra, setExtra] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState(false)
-  const [picks, setPicks] = useState<Record<string, { memberId: string; serveRole: string }>>({})
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const show = (res: Awaited<ReturnType<typeof fetchRoster>>) => {
@@ -61,20 +73,52 @@ export default function RosterPage() {
     fetchRoster(date).then(show)
   }, [date])
 
-  const change = async (method: 'POST' | 'DELETE', body: object) => {
-    setBusy(true)
-    setNotice(null)
+  const send = async (method: 'POST' | 'DELETE', body: object) => {
     const res = await requestJson('/api/admin/roster', { method, body })
-    setBusy(false)
-    if (!res.ok) {
-      setNotice({ kind: 'error', text: res.error })
-      return false
-    }
-    await load()
-    return true
+    if (!res.ok) setNotice({ kind: 'error', text: res.error })
+    return res.ok
   }
 
+  const service = data?.serviceTimes.find((s) => s.id === serviceId) ?? data?.serviceTimes[0]
+  const here = (data?.roster ?? []).filter((e) => e.serviceTimeId === service?.id)
+  const onService = new Set(here.map((e) => e.memberId))
   const nameOf = (memberId: string) => data?.volunteers.find((v) => v.id === memberId)?.name ?? 'Former Serve Team member'
+
+  // Someone picked for a role. Replacing a person adds the new one first, so a refusal leaves the old one in place.
+  const pick = async (role: string, memberId: string, current?: Entry) => {
+    if (!service || memberId === (current?.memberId ?? '')) return
+    setBusy(true)
+    setNotice(null)
+    let ok = true
+    if (memberId) ok = await send('POST', { date, serviceTimeId: service.id, memberId, serveRole: role })
+    if (ok && current) ok = await send('DELETE', { id: current.id })
+    if (ok && !current) setExtra((x) => ({ ...x, [role]: 0 }))
+    await load()
+    setBusy(false)
+  }
+
+  // Everyone on the Serve Team who isn't already serving at this service, plus whoever holds this slot.
+  const options = (current?: Entry) => (data?.volunteers ?? []).filter((v) => v.id === current?.memberId || !onService.has(v.id))
+
+  const slot = (role: string, current: Entry | undefined, key: string) => (
+    <div key={key} className="flex items-center gap-2">
+      <select
+        aria-label={`${role} at ${service?.label}`}
+        value={current?.memberId ?? ''}
+        onChange={(e) => pick(role, e.target.value, current)}
+        disabled={busy}
+        className={current ? inputClass : inputClass.replace('text-slate-800', 'text-slate-600')}
+      >
+        <option value="">{current ? 'Nobody' : 'Pick someone…'}</option>
+        {options(current).map((v) => (
+          <option key={v.id} value={v.id}>{v.name}</option>
+        ))}
+      </select>
+      {current?.checkedInAt && <span className="shrink-0 text-xs font-bold text-green-700">✓ In {time(current.checkedInAt)}</span>}
+    </div>
+  )
+
+  const others = here.filter((e) => !SERVE_ROLES.includes(e.serveRole))
 
   return (
     <main className="relative min-h-screen bg-gradient-to-b from-blue-50 via-sky-50 to-yellow-50 px-4 pt-6 pb-24">
@@ -82,28 +126,53 @@ export default function RosterPage() {
       <div className="relative mx-auto max-w-md space-y-4">
         <div className="text-center">
           <h1 className="text-2xl font-black text-slate-900"><span aria-hidden="true" className="mr-2">🙌</span>Roster</h1>
-          <p className="text-sm text-slate-600">Who&apos;s serving at each service.</p>
+          <p className="text-sm text-slate-600">Who&apos;s serving in each role.</p>
         </div>
 
-        <label className="card block p-4">
-          <span className="mb-1.5 block text-sm font-bold text-slate-700">Sunday</span>
-          {/* The native picker opens on tap; its own text is hidden under the mm/dd/yyyy label. */}
-          <span className="relative block">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => e.target.value && setDate(e.target.value)}
-              onClick={(e) => e.currentTarget.showPicker?.()}
-              className={`${inputClass.replace('text-slate-800', 'text-transparent')} cursor-pointer`}
-            />
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-base text-slate-900">
-              {mdy(date)} · {weekday(date)}
-            </span>
-          </span>
-        </label>
+        <div className="card space-y-3 p-4">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setDate((d) => addDays(d, -7))} aria-label="Previous Sunday" className={arrowButton}>◀</button>
+            {/* The native picker opens on tap; its own text is hidden under the mm/dd/yyyy label. */}
+            <label className="relative block flex-1">
+              <span className="sr-only">Date</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                className={`${inputClass.replace('text-slate-800', 'text-transparent')} cursor-pointer`}
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-base font-bold text-slate-900">
+                {mdy(date)} · {weekday(date)}
+              </span>
+            </label>
+            <button type="button" onClick={() => setDate((d) => addDays(d, 7))} aria-label="Next Sunday" className={arrowButton}>▶</button>
+          </div>
+
+          {data && data.serviceTimes.length > 1 && (
+            <div role="group" aria-label="Service" className="grid auto-cols-fr grid-flow-col gap-2">
+              {data.serviceTimes.map((st) => {
+                const active = st.id === service?.id
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setServiceId(st.id)}
+                    aria-pressed={active}
+                    className={`min-h-11 rounded-2xl px-2 py-1.5 text-sm font-black transition ${active ? 'bg-brand text-white shadow-md shadow-blue-200' : 'border-2 border-blue-100 bg-white text-slate-700 hover:bg-blue-50'}`}
+                  >
+                    {st.label}
+                    <span className="block text-xs font-bold opacity-80">
+                      {data.roster.filter((e) => e.serviceTimeId === st.id).length} serving
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
-
         {!data && <p role="status" className="py-4 text-center text-sm text-slate-600">Loading…</p>}
 
         {data && data.volunteers.length === 0 && (
@@ -115,79 +184,56 @@ export default function RosterPage() {
           </div>
         )}
 
-        <datalist id="serve-roles">
-          {[...SERVE_ROLES, ...(data?.roles ?? []).filter((r) => !SERVE_ROLES.includes(r))].map((r) => <option key={r} value={r} />)}
-        </datalist>
+        {data && service && data.volunteers.length > 0 && (
+          <section className="card divide-y-2 divide-blue-50 px-4" aria-label={`Roles at ${service.label}`}>
+            {SERVE_ROLES.map((role) => {
+              const [name, duty] = roleParts(role)
+              const people = here.filter((e) => e.serveRole === role)
+              const empties = (people.length ? 0 : 1) + (extra[role] ?? 0)
+              return (
+                <div key={role} className="space-y-2 py-3">
+                  <p className="text-sm font-black text-slate-800">
+                    {name}
+                    {duty && <span className="ml-1 font-bold text-slate-600">{duty}</span>}
+                  </p>
+                  {people.map((e) => slot(role, e, e.id))}
+                  {Array.from({ length: empties }, (_, i) => slot(role, undefined, `${role}-empty-${i}`))}
+                  {people.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExtra((x) => ({ ...x, [role]: (x[role] ?? 0) + 1 }))}
+                      className="min-h-11 text-sm font-bold text-brand hover:underline"
+                    >
+                      + another
+                    </button>
+                  )}
+                </div>
+              )
+            })}
 
-        {data && data.volunteers.length > 0 && data.serviceTimes.map((st) => {
-          const entries = data.roster.filter((r) => r.serviceTimeId === st.id).sort(byServeRole)
-          const onIt = new Set(entries.map((e) => e.memberId))
-          const pick = picks[st.id] ?? { memberId: '', serveRole: '' }
-          const setPick = (p: Partial<typeof pick>) => setPicks((all) => ({ ...all, [st.id]: { ...pick, ...p } }))
-          return (
-            <section key={st.id} className="card space-y-3 p-4" aria-labelledby={`st-${st.id}`}>
-              <h2 id={`st-${st.id}`} className="text-lg font-black text-slate-800">
-                {st.label}
-                <span className="ml-2 text-sm font-bold text-slate-600">{entries.length} serving</span>
-              </h2>
-
-              {entries.length === 0 && <p className="text-sm text-slate-600">Nobody yet.</p>}
-              {entries.map((e) => (
-                <div key={e.id} className="flex items-center gap-2 rounded-2xl border-2 border-blue-50 bg-white px-3 py-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-black text-slate-800">{nameOf(e.memberId)}</span>
-                    <span className="block text-xs text-slate-600">
-                      {e.serveRole || 'No role set'}
-                      {e.checkedInAt && <span className="font-bold text-green-700"> · ✓ In {time(e.checkedInAt)}</span>}
+            {others.length > 0 && (
+              <div className="space-y-2 py-3">
+                <p className="text-sm font-black text-slate-800">Other roles</p>
+                {others.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 text-sm text-slate-800">
+                      <span className="font-bold">{nameOf(e.memberId)}</span> · {e.serveRole || 'No role'}
                     </span>
-                  </span>
-                  <button
-                    onClick={() => change('DELETE', { id: e.id })}
-                    disabled={busy}
-                    aria-label={`Remove ${nameOf(e.memberId)} from ${st.label}`}
-                    className="min-h-11 rounded-lg px-3 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-
-              <div className="space-y-2 border-t-2 border-blue-50 pt-3">
-                <select
-                  aria-label={`Person to add to ${st.label}`}
-                  value={pick.memberId}
-                  onChange={(e) => setPick({ memberId: e.target.value })}
-                  className={inputClass}
-                >
-                  <option value="">Add someone…</option>
-                  {data.volunteers.filter((v) => !onIt.has(v.id)).map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </select>
-                <div className="flex gap-2">
-                  <input
-                    aria-label={`Role at ${st.label}`}
-                    list="serve-roles"
-                    value={pick.serveRole}
-                    onChange={(e) => setPick({ serveRole: e.target.value })}
-                    placeholder="Role, e.g. Games"
-                    maxLength={40}
-                    className={inputClass}
-                  />
-                  <button
-                    onClick={async () => {
-                      if (await change('POST', { date, serviceTimeId: st.id, ...pick })) setPicks((all) => ({ ...all, [st.id]: { memberId: '', serveRole: '' } }))
-                    }}
-                    disabled={!pick.memberId || busy}
-                    className="whitespace-nowrap rounded-2xl bg-brand px-5 py-3 text-sm font-black text-white shadow-md shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-40"
-                  >
-                    Add
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => pick(e.serveRole, '', e)}
+                      disabled={busy}
+                      aria-label={`Remove ${nameOf(e.memberId)}`}
+                      className="min-h-11 shrink-0 rounded-lg px-3 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
-            </section>
-          )
-        })}
+            )}
+          </section>
+        )}
       </div>
 
       <HelpWizard title="Roster guide" steps={HELP_STEPS} />
