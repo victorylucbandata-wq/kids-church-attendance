@@ -7,6 +7,7 @@ import SignOutButton from './SignOutButton'
 // The same header and tabs on every admin page, so leaders always know where they are.
 const TABS = [
   { href: '/admin', emoji: '📋', label: 'Today', match: (p: string) => p === '/admin' },
+  { href: '/admin/roster', emoji: '🙌', label: 'Roster', match: (p: string) => p.startsWith('/admin/roster') },
   { href: '/admin/members', emoji: '👥', label: 'Members', match: (p: string) => p.startsWith('/admin/members') },
   { href: '/admin/sessions', emoji: '📅', label: 'History', match: (p: string) => p.startsWith('/admin/sessions') },
   {
@@ -36,7 +37,7 @@ export default function AdminNav({ churchName, email, role }: Props) {
           <SignOutButton className="min-h-11 shrink-0 rounded-2xl border-2 border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 disabled:opacity-60" />
         </div>
 
-        <nav aria-label="Admin sections" className="grid grid-cols-4 gap-2">
+        <nav aria-label="Admin sections" className="grid grid-cols-5 gap-1.5">
           {TABS.map((t) => {
             const active = t.match(pathname)
             return (

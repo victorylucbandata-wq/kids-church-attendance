@@ -9,14 +9,16 @@ export async function loadDashboardData(ctx: AdminContext) {
   const supabase = ctx.db
   const churchId = ctx.church.id
   const today = todayInManila()
-  const serviceTimes = await listServiceTimes(churchId)
-
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('id, session_date, generated_at')
-    .eq('church_id', churchId)
-    .eq('session_date', today)
-    .maybeSingle()
+  const [serviceTimes, { data: session }, { data: rosterRows }] = await Promise.all([
+    listServiceTimes(churchId),
+    supabase.from('sessions').select('id, session_date, generated_at').eq('church_id', churchId).eq('session_date', today).maybeSingle(),
+    supabase.from('roster').select('service_time_id, member_id, serve_role, members(first_name, last_name, nickname)').eq('church_id', churchId).eq('service_date', today),
+  ])
+  // Today's Serve Team roster, shown on its own card (the kids' numbers leave the Serve Team out).
+  const roster = (rosterRows ?? []).map((r) => {
+    const m = r.members as unknown as { first_name: string; last_name: string; nickname: string | null }
+    return { serviceTimeId: r.service_time_id, memberId: r.member_id, serveRole: r.serve_role, memberName: formatDisplayName(m.first_name, m.last_name, m.nickname) }
+  })
 
   if (!session) {
     return {
@@ -26,6 +28,7 @@ export async function loadDashboardData(ctx: AdminContext) {
       email: ctx.email,
       serviceTimes,
       session: null,
+      roster,
       attendanceRows: [],
       firstTimers: [],
       summary: {
@@ -57,6 +60,7 @@ export async function loadDashboardData(ctx: AdminContext) {
     const ageGroupObj = m.age_groups as unknown as { name: string } | null
     return {
       attendanceId: a?.id ?? m.id,
+      memberId: m.id,
       memberName: formatDisplayName(m.first_name, m.last_name, m.nickname),
       firstName: m.first_name,
       lastName: m.last_name,
@@ -72,14 +76,15 @@ export async function loadDashboardData(ctx: AdminContext) {
     }
   })
 
-  const checkedIn = attendanceRows.filter((r) => r.checkedIn)
+  // Headcounts are kids only; the Serve Team is counted on its own card.
+  const checkedIn = attendanceRows.filter((r) => r.checkedIn && r.role === 'child')
   const byTimeSlot: Record<string, number> = {}
   const byRole: Record<string, number> = {}
   const byAgeGroup: Record<string, number> = {}
 
+  for (const r of attendanceRows.filter((r) => r.checkedIn)) byRole[r.role] = (byRole[r.role] ?? 0) + 1
   for (const r of checkedIn) {
     if (r.timeSlot) byTimeSlot[r.timeSlot] = (byTimeSlot[r.timeSlot] ?? 0) + 1
-    byRole[r.role] = (byRole[r.role] ?? 0) + 1
     if (r.ageGroup) byAgeGroup[r.ageGroup] = (byAgeGroup[r.ageGroup] ?? 0) + 1
   }
 
@@ -114,12 +119,13 @@ export async function loadDashboardData(ctx: AdminContext) {
     email: ctx.email,
     serviceTimes,
     session,
+    roster,
     attendanceRows,
     firstTimers,
     summary: {
-      totalMembers: attendanceRows.length,
+      totalMembers: attendanceRows.filter((r) => r.role === 'child').length,
       checkedIn: checkedIn.length,
-      notCheckedIn: attendanceRows.length - checkedIn.length,
+      notCheckedIn: attendanceRows.filter((r) => r.role === 'child').length - checkedIn.length,
       firstTimersToday: firstTimers.length,
       byTimeSlot,
       byRole,

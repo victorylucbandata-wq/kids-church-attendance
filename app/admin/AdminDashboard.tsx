@@ -29,7 +29,7 @@ const HELP_STEPS: HelpStep[] = [
   {
     emoji: '📊',
     title: 'Watch the numbers',
-    body: 'The summary cards show Checked In, Still Here, and Checked Out. Use the filter tabs (All / Still Here / Out) to quickly see who\'s still in the building.',
+    body: 'The summary cards show Checked In, Still Here, and Checked Out for kids. The Serve Team card shows who is rostered for each service and who has tapped in. Use the filter tabs (All / Still Here / Out) to see who\'s still in the building.',
   },
   {
     emoji: '👋',
@@ -327,6 +327,58 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
           </>
         )}
 
+        {/* Serve Team: today's roster per service, and who has tapped in */}
+        {(() => {
+          if (!data) return null
+          const volunteerIn = new Map(data.attendanceRows.filter(r => r.role === 'volunteer' && r.checkedIn).map(r => [r.memberId, r]))
+          const rostered = new Set(data.roster.map(e => e.memberId))
+          const extra = [...volunteerIn.values()].filter(r => !rostered.has(r.memberId))
+          const services = data.serviceTimes.filter(st => data.roster.some(e => e.serviceTimeId === st.id))
+          return (
+            <div className="card p-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-black text-slate-800"><span aria-hidden="true" className="mr-1.5">🙌</span>Serve Team</h2>
+                <Link href="/admin/roster" className="min-h-11 shrink-0 content-center rounded-xl border-2 border-blue-100 px-4 py-2 text-sm font-black text-brand hover:bg-blue-50">
+                  Plan roster →
+                </Link>
+              </div>
+              {services.length === 0 && extra.length === 0 && (
+                <p className="text-sm text-slate-600">No roster for today, and nobody from the Serve Team has tapped in yet.</p>
+              )}
+              {services.map(st => (
+                <div key={st.id} className="mb-3">
+                  <p className="mb-1 text-sm font-bold text-slate-700">{st.label}</p>
+                  {data.roster.filter(e => e.serviceTimeId === st.id).map(e => {
+                    const inAt = volunteerIn.get(e.memberId)?.checkedInAt ?? null
+                    return (
+                      <div key={e.memberId} className="flex items-center justify-between gap-3 py-1 text-sm">
+                        <span className="min-w-0 text-slate-800">
+                          <span className="font-bold">{e.memberName}</span>
+                          {e.serveRole && <span className="text-slate-600"> · {e.serveRole}</span>}
+                        </span>
+                        {inAt
+                          ? <span className="shrink-0 font-bold text-green-700 tabular-nums">✓ In {formatTime(inAt)}</span>
+                          : <span className="shrink-0 font-bold text-orange-800">Not yet</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+              {extra.length > 0 && (
+                <div>
+                  <p className="mb-1 text-sm font-bold text-slate-700">Also serving (not on the roster)</p>
+                  {extra.map(r => (
+                    <div key={r.memberId} className="flex items-center justify-between gap-3 py-1 text-sm">
+                      <span className="font-bold text-slate-800">{r.memberName}</span>
+                      <span className="shrink-0 font-bold text-green-700 tabular-nums">✓ In {formatTime(r.checkedInAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Manual check-in */}
         {data?.session && (
           <div className="card p-6">
@@ -380,8 +432,8 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
         )}
 
         {/* Attendance table */}
-        {data?.session && data.attendanceRows.filter(r => r.checkedIn).length > 0 && (() => {
-          const checkedInRows = data.attendanceRows.filter(r => r.checkedIn)
+        {data?.session && data.summary.checkedIn > 0 && (() => {
+          const checkedInRows = data.attendanceRows.filter(r => r.checkedIn && r.role === 'child')
           const filtered = attendanceFilter === 'here'
             ? checkedInRows.filter(r => !r.checkedOutAt)
             : attendanceFilter === 'out'
@@ -449,9 +501,6 @@ export default function AdminDashboard({ initialData, initialError }: Props) {
                       <p className={`font-black text-sm truncate ${row.checkedOutAt ? 'text-slate-500' : 'text-slate-800'}`}>
                         {(bdayToday || bdayWeek) && <span aria-hidden="true" className="mr-1">🎂</span>}
                         {row.memberName}
-                        {row.role === 'volunteer' && (
-                          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-brand">Serve</span>
-                        )}
                       </p>
                       <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
                         {row.ageGroup && <span>{row.ageGroup} · </span>}
