@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-09-26T20:31:31.846Z",
         "reason": "Claude, verified: only text-slate-600 on hover:bg-blue-50 (~7.2:1, AA pass); same false positive as prior audits"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "app/admin/roster/page.tsx"
+        ],
+        "createdAt": "2026-10-10T11:29:53.575Z",
+        "reason": "Claude triage: false positive — text-slate-700 applies only to inactive tabs on bg-white; the active bg-brand tab uses text-white (line 162 conditional class)"
       }
     ]
   }

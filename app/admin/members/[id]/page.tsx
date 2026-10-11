@@ -21,6 +21,11 @@ const HELP_STEPS: HelpStep[] = [
     body: 'Uncheck "Active Member" to hide them from the check-in list without deleting their record. You can reactivate them anytime.',
   },
   {
+    emoji: '🗑️',
+    title: 'Deleting for good',
+    body: 'If a parent asks for their child\'s details to be deleted, a Lead taps "Delete permanently". Their name, birthday, contacts and notes are erased and can\'t be brought back. Past headcounts stay the same.',
+  },
+  {
     emoji: '🏷️',
     title: 'Age group and role',
     body: 'Change their age group as they grow up, or switch their role between child and volunteer.',
@@ -86,6 +91,22 @@ export default function EditMemberPage() {
 
   const update = (field: keyof MemberForm, value: string | boolean) => {
     setForm(prev => prev ? { ...prev, [field]: value } : prev)
+  }
+
+  const [deleting, setDeleting] = useState(false)
+  const handleDelete = async () => {
+    if (!form) return
+    const who = `${form.first_name} ${form.last_name}`.trim()
+    if (!confirm(`Delete ${who}'s details permanently?\n\nTheir name, birthday, parent, contact number and notes will be erased and can't be brought back. Past headcounts stay the same.`)) return
+    setDeleting(true)
+    setMessage('')
+    const res = await requestJson(`/api/admin/members/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.push('/admin/members')
+    } else {
+      setMessage(res.error)
+      setDeleting(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -212,6 +233,20 @@ export default function EditMemberPage() {
             className="w-full rounded-2xl bg-brand px-4 py-3.5 font-black text-white shadow-lg shadow-blue-200 transition hover:bg-brand-strong disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+
+        <div className="card mt-4 space-y-2 p-6">
+          <p className="font-black text-slate-800">Delete permanently</p>
+          <p className="text-sm text-slate-600">
+            When a parent asks for their child&apos;s details to be deleted. Erases their name, birthday, parent, contact number and notes for good; past headcounts stay the same. Leads only. To just hide someone from check-in, untick Active Member instead.
+          </p>
+          <button
+            onClick={handleDelete}
+            disabled={deleting || saving}
+            className="min-h-11 w-full rounded-2xl border-2 border-red-200 bg-white px-4 py-2.5 text-sm font-black text-red-700 hover:bg-red-50 disabled:opacity-60"
+          >
+            {deleting ? 'Deleting…' : 'Delete permanently'}
           </button>
         </div>
 

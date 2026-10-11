@@ -74,3 +74,19 @@ export async function PATCH(request: Request, { params }: Params) {
 
   return Response.json({ success: true })
 }
+
+// A parent's request to delete their child's details. Leads only. With check-in history the
+// personal details are erased and an anonymous record keeps past headcounts right; without
+// history the record is deleted. The database function enforces the Lead rule too.
+export async function DELETE(_request: Request, { params }: Params) {
+  const ctx = await adminApi({ lead: true })
+  if (ctx instanceof Response) return ctx
+
+  const { id } = await params
+  const { data: member } = await ctx.db.from('members').select('id').eq('id', id).eq('church_id', ctx.church.id).maybeSingle()
+  if (!member) return Response.json({ success: false, error: 'That member is not part of this church.' }, { status: 404 })
+
+  const { data, error } = await ctx.db.rpc('erase_member', { target: id })
+  if (error) return Response.json({ success: false, error: 'Could not delete this member. Nothing was changed.' }, { status: 500 })
+  return Response.json({ success: true, result: data as 'erased' | 'deleted' })
+}
