@@ -20,7 +20,14 @@ export async function POST(request: Request) {
 
   // "No such user" stays silent (so this can't probe who has access); real failures don't.
   if (error && error.status === 429) {
-    return Response.json({ success: false, error: 'Too many sign-in requests. Wait a minute and try again.' }, { status: 429 })
+    // Three Supabase limits share this status: 60s per address, the project's hourly email cap,
+    // and 30 requests / 5 min per IP. Log which one so a screenshot isn't the only clue.
+    console.warn('[auth/login] Supabase 429', error.code, error.message)
+    const seconds = /after (\d+) seconds/.exec(error.message)?.[1]
+    const message = seconds
+      ? `A link was already sent to this address. Wait ${seconds} seconds, then check your inbox and spam before asking for another.`
+      : 'Too many sign-in requests. Wait a few minutes and try again, or ask your church lead.'
+    return Response.json({ success: false, error: message }, { status: 429 })
   }
   if (error && (error.status ?? 0) >= 500) {
     return Response.json({ success: false, error: 'We couldn\'t send the email just now. Try again in a minute, or ask your church lead.' }, { status: 502 })
