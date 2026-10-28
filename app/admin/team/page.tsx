@@ -79,7 +79,7 @@ export default function TeamPage() {
     e.preventDefault()
     const address = email.trim()
     const ok = await run('POST', { email: address, role }, (d) =>
-      d.invited ? `Invite sent to ${address}.` : `${address} already has an account and can sign in now.`
+      d.invited ? `Invite sent to ${address}. The link works for about an hour.` : `${address} already has an account and can sign in now.`
     )
     if (ok) setEmail('')
   }
