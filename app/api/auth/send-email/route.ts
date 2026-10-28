@@ -57,7 +57,9 @@ export async function POST(request: Request) {
   if (!ok) return fail(401, 'Invalid signature')
 
   const { user, email_data } = JSON.parse(raw) as HookPayload
-  const copy = COPY[email_data.email_action_type]
+  // An invitee who never opened their invite is still unconfirmed, so asking for a sign-in
+  // link makes Supabase send a "signup" confirmation instead of a magiclink. Same email to them.
+  const copy = COPY[email_data.email_action_type] ?? (email_data.email_action_type === 'signup' ? COPY.magiclink : undefined)
   if (!user.email || !copy) return fail(400, `Unsupported email type: ${email_data.email_action_type}`)
 
   // redirect_to is the app's /auth/confirm URL (checked by Supabase against its allow list).
